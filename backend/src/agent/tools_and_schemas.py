@@ -31,9 +31,22 @@ class QueryClassification(BaseModel):
     needs_web_search: bool = Field(
         description="Whether the query requires web search for current/real-time information."
     )
+    needs_knowledge_search: bool = Field(
+        description="Whether the query requires internal knowledge search for Channel Talk service-related information."
+    )
     reasoning: str = Field(
-        description="Explanation of why web search is or isn't needed."
+        description="Explanation of why web search or knowledge search is or isn't needed."
     )
     query_type: str = Field(
-        description="Type of query: 'smalltalk', 'general_knowledge', 'current_events', 'factual_lookup', etc."
+        description="Type of query: 'smalltalk', 'general_knowledge', 'current_events', 'factual_lookup', 'channel_talk_service', etc."
     )
+
+
+class KnowledgeSearchResult(BaseModel):
+    """Result from knowledge search."""
+
+    results: list[dict] = Field(
+        description="List of search results containing text and metadata."
+    )
+    query_used: str = Field(description="The actual query used for the search.")
+    total_results: int = Field(description="Total number of results found.")

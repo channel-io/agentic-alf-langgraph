@@ -34,6 +34,11 @@ export default function App() {
           title: "Generating Search Queries",
           data: event.generate_query?.search_query?.join(", ") || "",
         };
+      } else if (event.generate_knowledge_query) {
+        processedEvent = {
+          title: "Generating Knowledge Search Queries",
+          data: event.generate_knowledge_query?.search_query?.join(", ") || "",
+        };
       } else if (event.web_research) {
         const sources = event.web_research.sources_gathered || [];
         const numSources = sources.length;
@@ -47,15 +52,34 @@ export default function App() {
             exampleLabels || "N/A"
           }.`,
         };
+      } else if (event.knowledge_search) {
+        const results = event.knowledge_search.knowledge_search_result || [];
+        const searchQuery = event.knowledge_search.search_query?.[0] || "";
+        const numResults = results.length;
+        processedEvent = {
+          title: "Knowledge Search",
+          data: `Searching: "${searchQuery}". Found ${numResults} relevant result${numResults !== 1 ? 's' : ''} in internal knowledge base.`,
+        };
       } else if (event.reflection) {
         processedEvent = {
           title: "Reflection",
           data: "Analysing Web Research Results",
         };
+      } else if (event.knowledge_reflection) {
+        processedEvent = {
+          title: "Knowledge Reflection",
+          data: "Analysing Knowledge Search Results",
+        };
       } else if (event.finalize_answer) {
         processedEvent = {
           title: "Finalizing Answer",
           data: "Composing and presenting the final answer.",
+        };
+        hasFinalizeEventOccurredRef.current = true;
+      } else if (event.finalize_knowledge_answer) {
+        processedEvent = {
+          title: "Finalizing Knowledge Answer",
+          data: "Composing and presenting the final knowledge-based answer.",
         };
         hasFinalizeEventOccurredRef.current = true;
       }

@@ -1,6 +1,12 @@
 import os
+import traceback
 
-from agent.tools_and_schemas import SearchQueryList, Reflection, QueryClassification
+from agent.tools_and_schemas import (
+    SearchQueryList,
+    Reflection,
+    QueryClassification,
+    KnowledgeSearchResult,
+)
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from langgraph.types import Send
@@ -14,15 +20,20 @@ from agent.state import (
     QueryGenerationState,
     ReflectionState,
     WebSearchState,
+    KnowledgeSearchState,
     QueryClassificationState,
 )
 from agent.configuration import Configuration
 from agent.prompts import (
     get_current_date,
     query_writer_instructions,
+    knowledge_query_writer_instructions,
     web_searcher_instructions,
+    knowledge_searcher_instructions,
     reflection_instructions,
+    knowledge_reflection_instructions,
     answer_instructions,
+    knowledge_answer_instructions,
     query_classification_instructions,
     direct_answer_instructions,
 )
@@ -33,6 +44,7 @@ from agent.utils import (
     insert_citation_markers,
     resolve_urls,
 )
+from agent.tools.retrieve import generate_embeddings, query_to_vss
 
 load_dotenv()
 
@@ -47,17 +59,17 @@ genai_client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 def classify_query(
     state: OverallState, config: RunnableConfig
 ) -> QueryClassificationState:
-    """LangGraph node that classifies whether a query needs web search or can be answered directly.
+    """LangGraph node that classifies whether a query needs web search, knowledge search, or can be answered directly.
 
     Analyzes the user's question to determine if it requires current/real-time information
-    that would need web search, or if it can be answered directly with general knowledge.
+    that would need web search, Channel Talk internal knowledge search, or if it can be answered directly with general knowledge.
 
     Args:
         state: Current graph state containing the user's question
         config: Configuration for the runnable, including LLM provider settings
 
     Returns:
-        Dictionary with state update, including needs_web_search and query classification info
+        Dictionary with state update, including needs_web_search, needs_knowledge_search and query classification info
     """
     configurable = Configuration.from_runnable_config(config)
 
@@ -82,6 +94,7 @@ def classify_query(
 
     return {
         "needs_web_search": result.needs_web_search,
+        "needs_knowledge_search": result.needs_knowledge_search,
         "query_classification": result.query_type,
     }
 
@@ -125,19 +138,21 @@ def direct_answer(state: OverallState, config: RunnableConfig) -> OverallState:
 
 
 def route_after_classification(state: QueryClassificationState) -> str:
-    """LangGraph routing function that determines whether to use web search or direct answer.
+    """LangGraph routing function that determines whether to use web search, knowledge search, or direct answer.
 
     Routes the query based on the classification result - either to web research
-    for current information or direct answer for general knowledge.
+    for current information, knowledge search for Channel Talk information, or direct answer for general knowledge.
 
     Args:
         state: Current graph state containing the classification result
 
     Returns:
-        String literal indicating the next node to visit ("generate_query" or "direct_answer")
+        String literal indicating the next node to visit ("generate_query", "generate_knowledge_query", or "direct_answer")
     """
     if state["needs_web_search"]:
         return "generate_query"
+    elif state["needs_knowledge_search"]:
+        return "generate_knowledge_query"
     else:
         return "direct_answer"
 
@@ -366,6 +381,237 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     }
 
 
+def generate_knowledge_query(
+    state: OverallState, config: RunnableConfig
+) -> QueryGenerationState:
+    """LangGraph node that generates knowledge search queries based on the User's question.
+
+    Uses Gemini 2.0 Flash to create optimized search queries for Channel Talk knowledge base research based on
+    the User's question.
+
+    Args:
+        state: Current graph state containing the User's question
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including search_query key containing the generated queries
+    """
+    configurable = Configuration.from_runnable_config(config)
+
+    # check for custom initial search query count
+    if state.get("initial_search_query_count") is None:
+        state["initial_search_query_count"] = configurable.number_of_initial_queries
+
+    # init Gemini 2.0 Flash
+    llm = ChatGoogleGenerativeAI(
+        model=configurable.query_generator_model,
+        temperature=1.0,
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+    structured_llm = llm.with_structured_output(SearchQueryList)
+
+    # Format the prompt
+    current_date = get_current_date()
+    formatted_prompt = knowledge_query_writer_instructions.format(
+        current_date=current_date,
+        research_topic=get_research_topic(state["messages"]),
+        number_queries=state["initial_search_query_count"],
+    )
+    # Generate the search queries
+    result = structured_llm.invoke(formatted_prompt)
+    return {"search_query": result.query}
+
+
+def continue_to_knowledge_search(state: QueryGenerationState):
+    """LangGraph node that sends the search queries to the knowledge search node.
+
+    This is used to spawn n number of knowledge search nodes, one for each search query.
+    """
+    return [
+        Send("knowledge_search", {"search_query": search_query, "id": int(idx)})
+        for idx, search_query in enumerate(state["search_query"])
+    ]
+
+
+def knowledge_search(
+    state: KnowledgeSearchState, config: RunnableConfig
+) -> OverallState:
+    """LangGraph node that performs knowledge search using the internal Channel Talk knowledge base.
+
+    Executes a knowledge search using the retrieve.py tool to search Channel Talk internal documentation.
+
+    Args:
+        state: Current graph state containing the search query and id
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including knowledge_search_result key containing the search results
+    """
+    import asyncio
+
+    configurable = Configuration.from_runnable_config(config)
+    formatted_prompt = knowledge_searcher_instructions.format(
+        research_topic=state["search_query"],
+    )
+
+    async def _async_search():
+        try:
+            # Generate embeddings for the search query
+            embeddings, latency = await generate_embeddings([state["search_query"]])
+
+            # Perform vector search
+            search_results = await query_to_vss(
+                embeddings[0], state["search_query"], 10
+            )
+
+            if not search_results:
+                return {
+                    "knowledge_search_result": [
+                        "검색 결과가 없습니다. 다른 키워드로 다시 시도해보세요."
+                    ],
+                    "search_query": [],
+                }
+
+            # Combine search results into a formatted response
+            combined_results = ""
+            for i, result in enumerate(search_results, 1):
+                combined_results += f"{result.get('text', '')}\n\n"
+
+            return {
+                "knowledge_search_result": [combined_results],
+                "search_query": [state["search_query"]],
+            }
+
+        except Exception as e:
+            print(f"지식 검색 중 오류가 발생했습니다: {traceback.format_exc()}")
+            error_message = f"지식 검색 중 오류가 발생했습니다: {str(e)}"
+            return {"knowledge_search_result": [error_message]}
+
+    # Run the async search
+    return asyncio.run(_async_search())
+
+
+def knowledge_reflection(
+    state: OverallState, config: RunnableConfig
+) -> ReflectionState:
+    """LangGraph node that identifies knowledge gaps and generates potential follow-up queries for Channel Talk knowledge.
+
+    Analyzes the current knowledge search results to identify areas for further research and generates
+    potential follow-up queries. Uses structured output to extract
+    the follow-up query in JSON format.
+
+    Args:
+        state: Current graph state containing the knowledge search results and research topic
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including search_query key containing the generated follow-up query
+    """
+    configurable = Configuration.from_runnable_config(config)
+    # Increment the research loop count and get the reasoning model
+    state["research_loop_count"] = state.get("research_loop_count", 0) + 1
+    reasoning_model = state.get("reasoning_model", configurable.reflection_model)
+
+    # Format the prompt
+    current_date = get_current_date()
+    formatted_prompt = knowledge_reflection_instructions.format(
+        current_date=current_date,
+        research_topic=get_research_topic(state["messages"]),
+        summaries="\n\n---\n\n".join(state["knowledge_search_result"]),
+    )
+    # init Reasoning Model
+    llm = ChatGoogleGenerativeAI(
+        model=reasoning_model,
+        temperature=1.0,
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+    result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
+
+    return {
+        "is_sufficient": result.is_sufficient,
+        "knowledge_gap": result.knowledge_gap,
+        "follow_up_queries": result.follow_up_queries,
+        "research_loop_count": state["research_loop_count"],
+        "number_of_ran_queries": len(state["search_query"]),
+    }
+
+
+def evaluate_knowledge_search(
+    state: ReflectionState,
+    config: RunnableConfig,
+) -> OverallState:
+    """LangGraph routing function that determines the next step in the knowledge search flow.
+
+    Controls the knowledge search loop by deciding whether to continue gathering information
+    or to finalize the summary based on the configured maximum number of research loops.
+
+    Args:
+        state: Current graph state containing the research loop count
+        config: Configuration for the runnable, including max_research_loops setting
+
+    Returns:
+        String literal indicating the next node to visit ("knowledge_search" or "finalize_knowledge_answer")
+    """
+    configurable = Configuration.from_runnable_config(config)
+    max_research_loops = (
+        state.get("max_research_loops")
+        if state.get("max_research_loops") is not None
+        else configurable.max_research_loops
+    )
+    if state["is_sufficient"] or state["research_loop_count"] >= max_research_loops:
+        return "finalize_knowledge_answer"
+    else:
+        return [
+            Send(
+                "knowledge_search",
+                {
+                    "search_query": follow_up_query,
+                    "id": state["number_of_ran_queries"] + int(idx),
+                },
+            )
+            for idx, follow_up_query in enumerate(state["follow_up_queries"])
+        ]
+
+
+def finalize_knowledge_answer(state: OverallState, config: RunnableConfig):
+    """LangGraph node that finalizes the knowledge search summary.
+
+    Prepares the final output by formatting the knowledge search results
+    into a well-structured response about Channel Talk services.
+
+    Args:
+        state: Current graph state containing the knowledge search results
+
+    Returns:
+        Dictionary with state update, including messages key containing the formatted final answer
+    """
+    configurable = Configuration.from_runnable_config(config)
+    reasoning_model = state.get("reasoning_model") or configurable.answer_model
+
+    # Format the prompt
+    current_date = get_current_date()
+    formatted_prompt = knowledge_answer_instructions.format(
+        current_date=current_date,
+        research_topic=get_research_topic(state["messages"]),
+        summaries="\n---\n\n".join(state["knowledge_search_result"]),
+    )
+
+    # init Reasoning Model, default to Gemini 2.5 Flash
+    llm = ChatGoogleGenerativeAI(
+        model=reasoning_model,
+        temperature=0,
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+    result = llm.invoke(formatted_prompt)
+
+    return {
+        "messages": [AIMessage(content=result.content)],
+    }
+
+
 # Create our Agent Graph
 builder = StateGraph(OverallState, config_schema=Configuration)
 
@@ -376,6 +622,10 @@ builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
 builder.add_node("reflection", reflection)
 builder.add_node("finalize_answer", finalize_answer)
+builder.add_node("generate_knowledge_query", generate_knowledge_query)
+builder.add_node("knowledge_search", knowledge_search)
+builder.add_node("knowledge_reflection", knowledge_reflection)
+builder.add_node("finalize_knowledge_answer", finalize_knowledge_answer)
 
 # Set the entrypoint as `classify_query`
 # This means that this node is the first one called
@@ -383,7 +633,9 @@ builder.add_edge(START, "classify_query")
 
 # Add conditional edge based on query classification
 builder.add_conditional_edges(
-    "classify_query", route_after_classification, ["generate_query", "direct_answer"]
+    "classify_query",
+    route_after_classification,
+    ["generate_query", "direct_answer", "generate_knowledge_query"],
 )
 
 # Direct answer goes straight to END
@@ -401,5 +653,20 @@ builder.add_conditional_edges(
 )
 # Finalize the answer
 builder.add_edge("finalize_answer", END)
+
+# Add conditional edge to continue with knowledge search in a parallel branch
+builder.add_conditional_edges(
+    "generate_knowledge_query", continue_to_knowledge_search, ["knowledge_search"]
+)
+# Reflect on the knowledge search
+builder.add_edge("knowledge_search", "knowledge_reflection")
+# Evaluate the knowledge search
+builder.add_conditional_edges(
+    "knowledge_reflection",
+    evaluate_knowledge_search,
+    ["knowledge_search", "finalize_knowledge_answer"],
+)
+# Finalize the knowledge answer
+builder.add_edge("finalize_knowledge_answer", END)
 
 graph = builder.compile(name="pro-search-agent")

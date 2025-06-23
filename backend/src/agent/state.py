@@ -12,14 +12,16 @@ import operator
 
 class OverallState(TypedDict):
     messages: Annotated[list, add_messages]
-    search_query: Annotated[list, operator.add]
+    search_query: Annotated[list[str], operator.add]
     web_research_result: Annotated[list, operator.add]
+    knowledge_search_result: Annotated[list, operator.add]
     sources_gathered: Annotated[list, operator.add]
     initial_search_query_count: int
     max_research_loops: int
     research_loop_count: int
     reasoning_model: str
     needs_web_search: bool
+    needs_knowledge_search: bool
     query_classification: str
 
 
@@ -45,8 +47,14 @@ class WebSearchState(TypedDict):
     id: str
 
 
+class KnowledgeSearchState(TypedDict):
+    search_query: str
+    id: str
+
+
 class QueryClassificationState(TypedDict):
     needs_web_search: bool
+    needs_knowledge_search: bool
     reasoning: str
     query_type: str
 

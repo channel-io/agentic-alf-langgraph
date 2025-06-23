@@ -18,6 +18,9 @@ dependencies = [
     "langgraph-api",
     "fastapi",
     "google-genai",
+    "aiohttp",
+    "pinecone==7.2.0",
+    "tritonclient==2.58.0",
 ]
 
 
