@@ -5,7 +5,6 @@ from agent.tools_and_schemas import (
     SearchQueryList,
     Reflection,
     QueryClassification,
-    KnowledgeSearchResult,
 )
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
@@ -33,7 +32,6 @@ from agent.prompts import (
     reflection_instructions,
     knowledge_reflection_instructions,
     answer_instructions,
-    knowledge_answer_instructions,
     query_classification_instructions,
     direct_answer_instructions,
 )
@@ -338,7 +336,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
 
     Prepares the final output by deduplicating and formatting sources, then
     combining them with the running summary to create a well-structured
-    research report with proper citations.
+    research report with proper citations. Handles both web search and knowledge search results.
 
     Args:
         state: Current graph state containing the running summary and sources gathered
@@ -349,12 +347,19 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
 
+    # Combine web search and knowledge search results
+    all_summaries = []
+    if state.get("web_research_result"):
+        all_summaries.extend(state["web_research_result"])
+    if state.get("knowledge_search_result"):
+        all_summaries.extend(state["knowledge_search_result"])
+
     # Format the prompt
     current_date = get_current_date()
     formatted_prompt = answer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
-        summaries="\n---\n\n".join(state["web_research_result"]),
+        summaries="\n---\n\n".join(all_summaries),
     )
 
     # init Reasoning Model, default to Gemini 2.5 Flash
@@ -366,14 +371,15 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     )
     result = llm.invoke(formatted_prompt)
 
-    # Replace the short urls with the original urls and add all used urls to the sources_gathered
+    # Replace the short urls with the original urls and add all used urls to the sources_gathered (for web search)
     unique_sources = []
-    for source in state["sources_gathered"]:
-        if source["short_url"] in result.content:
-            result.content = result.content.replace(
-                source["short_url"], source["value"]
-            )
-            unique_sources.append(source)
+    if state.get("sources_gathered"):
+        for source in state["sources_gathered"]:
+            if source["short_url"] in result.content:
+                result.content = result.content.replace(
+                    source["short_url"], source["value"]
+                )
+                unique_sources.append(source)
 
     return {
         "messages": [AIMessage(content=result.content)],
@@ -552,7 +558,7 @@ def evaluate_knowledge_search(
         config: Configuration for the runnable, including max_research_loops setting
 
     Returns:
-        String literal indicating the next node to visit ("knowledge_search" or "finalize_knowledge_answer")
+        String literal indicating the next node to visit ("knowledge_search" or "finalize_answer")
     """
     configurable = Configuration.from_runnable_config(config)
     max_research_loops = (
@@ -561,7 +567,7 @@ def evaluate_knowledge_search(
         else configurable.max_research_loops
     )
     if state["is_sufficient"] or state["research_loop_count"] >= max_research_loops:
-        return "finalize_knowledge_answer"
+        return "finalize_answer"
     else:
         return [
             Send(
@@ -573,43 +579,6 @@ def evaluate_knowledge_search(
             )
             for idx, follow_up_query in enumerate(state["follow_up_queries"])
         ]
-
-
-def finalize_knowledge_answer(state: OverallState, config: RunnableConfig):
-    """LangGraph node that finalizes the knowledge search summary.
-
-    Prepares the final output by formatting the knowledge search results
-    into a well-structured response about Channel Talk services.
-
-    Args:
-        state: Current graph state containing the knowledge search results
-
-    Returns:
-        Dictionary with state update, including messages key containing the formatted final answer
-    """
-    configurable = Configuration.from_runnable_config(config)
-    reasoning_model = state.get("reasoning_model") or configurable.answer_model
-
-    # Format the prompt
-    current_date = get_current_date()
-    formatted_prompt = knowledge_answer_instructions.format(
-        current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
-        summaries="\n---\n\n".join(state["knowledge_search_result"]),
-    )
-
-    # init Reasoning Model, default to Gemini 2.5 Flash
-    llm = ChatGoogleGenerativeAI(
-        model=reasoning_model,
-        temperature=0,
-        max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    result = llm.invoke(formatted_prompt)
-
-    return {
-        "messages": [AIMessage(content=result.content)],
-    }
 
 
 # Create our Agent Graph
@@ -625,7 +594,6 @@ builder.add_node("finalize_answer", finalize_answer)
 builder.add_node("generate_knowledge_query", generate_knowledge_query)
 builder.add_node("knowledge_search", knowledge_search)
 builder.add_node("knowledge_reflection", knowledge_reflection)
-builder.add_node("finalize_knowledge_answer", finalize_knowledge_answer)
 
 # Set the entrypoint as `classify_query`
 # This means that this node is the first one called
@@ -664,9 +632,7 @@ builder.add_edge("knowledge_search", "knowledge_reflection")
 builder.add_conditional_edges(
     "knowledge_reflection",
     evaluate_knowledge_search,
-    ["knowledge_search", "finalize_knowledge_answer"],
+    ["knowledge_search", "finalize_answer"],
 )
-# Finalize the knowledge answer
-builder.add_edge("finalize_knowledge_answer", END)
 
 graph = builder.compile(name="pro-search-agent")

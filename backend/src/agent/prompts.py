@@ -177,7 +177,7 @@ Knowledge Search Results:
 """
 
 
-answer_instructions = """Generate a high-quality answer to the user's question based on the provided summaries.
+answer_instructions = """Generate a high-quality answer to the user's question based on the provided summaries from web search and/or knowledge search results.
 
 Instructions:
 - The current date is {current_date}.
@@ -185,32 +185,15 @@ Instructions:
 - You have access to all the information gathered from the previous steps.
 - You have access to the user's question.
 - Generate a high-quality answer to the user's question based on the provided summaries and the user's question.
-- Include the sources you used from the Summaries in the answer correctly, use markdown format (e.g. [apnews](https://vertexaisearch.cloud.google.com/id/1-0)). THIS IS A MUST.
+- If the summaries contain web search results, include the sources correctly using markdown format (e.g. [apnews](https://vertexaisearch.cloud.google.com/id/1-0)).
+- If the summaries contain Channel Talk knowledge search results, include the sources correctly using markdown format (e.g. [title](#)). THIS IS A MUST.
+- If the summaries contain Channel Talk knowledge search results, provide accurate Channel Talk service information and use Korean explanations when appropriate.
+- Focus on practical usage and features when answering Channel Talk related questions.
 
 User Context:
 - {research_topic}
 
 Summaries:
-{summaries}"""
-
-
-knowledge_answer_instructions = """Generate a high-quality answer to the user's Channel Talk related question based on the provided knowledge search results.
-
-Instructions:
-- The current date is {current_date}.
-- You are the final step of a multi-step Channel Talk knowledge research process, don't mention that you are the final step.
-- You have access to all the Channel Talk information gathered from the internal knowledge base.
-- You have access to the user's question.
-- Generate a high-quality answer to the user's Channel Talk question based on the provided knowledge search results.
-- Provide accurate Channel Talk service information based on the internal documentation.
-- Use Korean explanations when appropriate for better understanding.
-- Focus on practical Channel Talk usage and features.
-- Include the sources you used from the Knowledge Search Results in the answer correctly, use markdown format (e.g. [title](#)). THIS IS A MUST.
-
-User Context:
-- {research_topic}
-
-Knowledge Search Results:
 {summaries}"""
 
 
