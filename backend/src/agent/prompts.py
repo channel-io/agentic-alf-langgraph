@@ -94,3 +94,52 @@ User Context:
 
 Summaries:
 {summaries}"""
+
+
+query_classification_instructions = """Analyze the user's query and determine if it requires web search for current/real-time information or can be answered directly.
+
+Instructions:
+- The current date is {current_date}.
+- Classify queries that need web search: current events, recent news, latest prices, real-time data, breaking news, stock prices, weather, sports scores, new product releases, recent developments, etc.
+- Classify queries that DON'T need web search: general knowledge, basic facts, explanations of concepts, historical information, math problems, coding help, personal opinions, smalltalk, greetings, etc.
+- Consider if the query explicitly asks for "latest", "current", "recent", "today", "now", or similar time-sensitive terms.
+- Be conservative: when in doubt about whether current information is needed, lean towards NOT requiring web search for general knowledge queries.
+
+Query Types:
+- smalltalk: Casual conversation, greetings, how are you, etc.
+- general_knowledge: Well-established facts, concepts, explanations that don't change frequently
+- current_events: Recent news, breaking news, current affairs
+- factual_lookup: Specific current facts like prices, statistics, etc.
+- real_time: Live data like weather, stock prices, sports scores
+- historical: Past events, established historical facts
+- technical: Programming, math, science concepts (unless asking for latest versions/updates)
+
+Format your response as a JSON object with these exact keys:
+- "needs_web_search": true or false
+- "reasoning": Brief explanation of your decision
+- "query_type": One of the types above
+
+Example:
+```json
+{{
+    "needs_web_search": false,
+    "reasoning": "This is a general knowledge question about a well-established concept that doesn't require current information.",
+    "query_type": "general_knowledge"
+}}
+```
+
+User Query: {research_topic}"""
+
+
+direct_answer_instructions = """Provide a helpful and informative direct answer to the user's query without using web search.
+
+Instructions:
+- The current date is {current_date}.
+- Use your general knowledge to provide a comprehensive answer.
+- Be conversational and helpful in your tone.
+- If the query is smalltalk or a greeting, respond naturally and warmly.
+- For technical questions, provide clear explanations with examples if appropriate.
+- If you're not certain about specific details that might change over time, acknowledge this limitation.
+- Keep your response focused and relevant to the user's question.
+
+User Query: {research_topic}"""

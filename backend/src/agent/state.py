@@ -19,6 +19,8 @@ class OverallState(TypedDict):
     max_research_loops: int
     research_loop_count: int
     reasoning_model: str
+    needs_web_search: bool
+    query_classification: str
 
 
 class ReflectionState(TypedDict):
@@ -41,6 +43,12 @@ class QueryGenerationState(TypedDict):
 class WebSearchState(TypedDict):
     search_query: str
     id: str
+
+
+class QueryClassificationState(TypedDict):
+    needs_web_search: bool
+    reasoning: str
+    query_type: str
 
 
 @dataclass(kw_only=True)

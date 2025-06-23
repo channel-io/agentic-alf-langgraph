@@ -1,6 +1,6 @@
 import os
 
-from agent.tools_and_schemas import SearchQueryList, Reflection
+from agent.tools_and_schemas import SearchQueryList, Reflection, QueryClassification
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from langgraph.types import Send
@@ -14,6 +14,7 @@ from agent.state import (
     QueryGenerationState,
     ReflectionState,
     WebSearchState,
+    QueryClassificationState,
 )
 from agent.configuration import Configuration
 from agent.prompts import (
@@ -22,6 +23,8 @@ from agent.prompts import (
     web_searcher_instructions,
     reflection_instructions,
     answer_instructions,
+    query_classification_instructions,
+    direct_answer_instructions,
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
 from agent.utils import (
@@ -41,6 +44,104 @@ genai_client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 # Nodes
+def classify_query(
+    state: OverallState, config: RunnableConfig
+) -> QueryClassificationState:
+    """LangGraph node that classifies whether a query needs web search or can be answered directly.
+
+    Analyzes the user's question to determine if it requires current/real-time information
+    that would need web search, or if it can be answered directly with general knowledge.
+
+    Args:
+        state: Current graph state containing the user's question
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including needs_web_search and query classification info
+    """
+    configurable = Configuration.from_runnable_config(config)
+
+    # init Gemini 2.0 Flash
+    llm = ChatGoogleGenerativeAI(
+        model=configurable.query_generator_model,
+        temperature=0.3,
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+    structured_llm = llm.with_structured_output(QueryClassification)
+
+    # Format the prompt
+    current_date = get_current_date()
+    formatted_prompt = query_classification_instructions.format(
+        current_date=current_date,
+        research_topic=get_research_topic(state["messages"]),
+    )
+
+    # Classify the query
+    result = structured_llm.invoke(formatted_prompt)
+
+    return {
+        "needs_web_search": result.needs_web_search,
+        "query_classification": result.query_type,
+    }
+
+
+def direct_answer(state: OverallState, config: RunnableConfig) -> OverallState:
+    """LangGraph node that provides direct answers without web search.
+
+    Responds to queries that don't require current information using the model's
+    general knowledge, suitable for smalltalk, general questions, and established facts.
+
+    Args:
+        state: Current graph state containing the user's question
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including the direct answer message
+    """
+    configurable = Configuration.from_runnable_config(config)
+    reasoning_model = state.get("reasoning_model", configurable.answer_model)
+
+    # Format the prompt
+    current_date = get_current_date()
+    formatted_prompt = direct_answer_instructions.format(
+        current_date=current_date,
+        research_topic=get_research_topic(state["messages"]),
+    )
+
+    # init LLM for direct answer
+    llm = ChatGoogleGenerativeAI(
+        model=reasoning_model,
+        temperature=0.7,
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+
+    result = llm.invoke(formatted_prompt)
+
+    return {
+        "messages": [AIMessage(content=result.content)],
+    }
+
+
+def route_after_classification(state: QueryClassificationState) -> str:
+    """LangGraph routing function that determines whether to use web search or direct answer.
+
+    Routes the query based on the classification result - either to web research
+    for current information or direct answer for general knowledge.
+
+    Args:
+        state: Current graph state containing the classification result
+
+    Returns:
+        String literal indicating the next node to visit ("generate_query" or "direct_answer")
+    """
+    if state["needs_web_search"]:
+        return "generate_query"
+    else:
+        return "direct_answer"
+
+
 def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerationState:
     """LangGraph node that generates search queries based on the User's question.
 
@@ -269,14 +370,25 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
 builder = StateGraph(OverallState, config_schema=Configuration)
 
 # Define the nodes we will cycle between
+builder.add_node("classify_query", classify_query)
+builder.add_node("direct_answer", direct_answer)
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
 builder.add_node("reflection", reflection)
 builder.add_node("finalize_answer", finalize_answer)
 
-# Set the entrypoint as `generate_query`
+# Set the entrypoint as `classify_query`
 # This means that this node is the first one called
-builder.add_edge(START, "generate_query")
+builder.add_edge(START, "classify_query")
+
+# Add conditional edge based on query classification
+builder.add_conditional_edges(
+    "classify_query", route_after_classification, ["generate_query", "direct_answer"]
+)
+
+# Direct answer goes straight to END
+builder.add_edge("direct_answer", END)
+
 # Add conditional edge to continue with search queries in a parallel branch
 builder.add_conditional_edges(
     "generate_query", continue_to_web_research, ["web_research"]
