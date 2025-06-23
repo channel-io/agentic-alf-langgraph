@@ -86,7 +86,7 @@ export function ActivityTimeline({
                 </div>
                 <div>
                   <p className="text-sm text-neutral-300 font-medium">
-                    Searching...
+                    Running...
                   </p>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export function ActivityTimeline({
                     </div>
                     <div>
                       <p className="text-sm text-neutral-300 font-medium">
-                        Searching...
+                        Running...
                       </p>
                     </div>
                   </div>

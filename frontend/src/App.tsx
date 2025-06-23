@@ -29,7 +29,28 @@ export default function App() {
     messagesKey: "messages",
     onUpdateEvent: (event: any) => {
       let processedEvent: ProcessedEvent | null = null;
-      if (event.generate_query) {
+      if (event.input_guardrail) {
+        const isSafe = event.input_guardrail?.is_safe_input;
+        const violations = event.input_guardrail?.guardrail_violations || [];
+        const originalInput = event.input_guardrail?.original_input || "";
+        
+        if (isSafe) {
+          processedEvent = {
+            title: "🛡️ Input Security Check",
+            data: `Input validated successfully. Safe to proceed with: "${originalInput.substring(0, 50)}${originalInput.length > 50 ? '...' : ''}"`
+          };
+        } else {
+          processedEvent = {
+            title: "🚨 Security Violation Detected",
+            data: `Input blocked due to: ${violations.join(", ")}. Original input length: ${originalInput.length} characters.`
+          };
+        }
+      } else if (event.guardrail_block) {
+        processedEvent = {
+          title: "🛡️ Request Blocked",
+          data: "Request has been blocked by security guardrails for policy violations."
+        };
+      } else if (event.generate_query) {
         processedEvent = {
           title: "Generating Search Queries",
           data: event.generate_query?.search_query?.join(", ") || "",
@@ -66,9 +87,11 @@ export default function App() {
           data: "Analysing Web Research Results",
         };
       } else if (event.knowledge_reflection) {
+        const knowledgeGap = event.knowledge_reflection.knowledge_gap;
+        const followUpQueries = event.knowledge_reflection.follow_up_queries;
         processedEvent = {
           title: "Knowledge Reflection",
-          data: "Analysing Knowledge Search Results",
+          data: `Analysing Knowledge Search Results: ${knowledgeGap}. Follow-up Queries: ${followUpQueries}`,
         };
       } else if (event.finalize_answer) {
         processedEvent = {

@@ -40,3 +40,13 @@ class QueryClassification(BaseModel):
     query_type: str = Field(
         description="Type of query: 'smalltalk', 'general_knowledge', 'current_events', 'factual_lookup', 'channel_talk_service', etc."
     )
+
+
+class InputGuardrailResult(BaseModel):
+    """Result of input guardrail validation."""
+
+    is_safe: bool = Field(description="Whether the input is safe and can proceed.")
+    violations: list[str] = Field(
+        description="List of detected violations (empty if safe)."
+    )
+    reasoning: str = Field(description="Explanation of the guardrail decision.")

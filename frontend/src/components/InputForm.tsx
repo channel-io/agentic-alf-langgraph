@@ -86,7 +86,7 @@ export const InputForm: React.FC<InputFormProps> = ({
               } p-2 cursor-pointer rounded-full transition-all duration-200 text-base`}
               disabled={isSubmitDisabled}
             >
-              Search
+              RUN
               <Send className="h-5 w-5" />
             </Button>
           )}
@@ -170,7 +170,7 @@ export const InputForm: React.FC<InputFormProps> = ({
             onClick={() => window.location.reload()}
           >
             <SquarePen size={16} />
-            New Search
+            RUN
           </Button>
         )}
       </div>

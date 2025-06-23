@@ -5,6 +5,7 @@ from agent.tools_and_schemas import (
     SearchQueryList,
     Reflection,
     QueryClassification,
+    InputGuardrailResult,
 )
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
@@ -34,6 +35,7 @@ from agent.prompts import (
     answer_instructions,
     query_classification_instructions,
     direct_answer_instructions,
+    input_guardrail_instructions,
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
 from agent.utils import (
@@ -54,6 +56,123 @@ genai_client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 # Nodes
+def input_guardrail(state: OverallState, config: RunnableConfig) -> OverallState:
+    """LangGraph node that validates user input against security guardrails.
+
+    Checks for potential security threats including:
+    - System prompt injection attempts
+    - Discriminatory or hateful language
+    - Personal information extraction attempts
+    - Illegal activity requests
+
+    Args:
+        state: Current graph state containing the user's messages
+        config: Configuration for the runnable, including LLM provider settings
+
+    Returns:
+        Dictionary with state update, including is_safe_input, guardrail_violations, and original_input
+    """
+    configurable = Configuration.from_runnable_config(config)
+
+    # Extract the latest user message
+    user_messages = [
+        msg for msg in state["messages"] if hasattr(msg, "type") and msg.type == "human"
+    ]
+    if not user_messages:
+        # No user messages found, treat as safe
+        return {
+            "is_safe_input": True,
+            "guardrail_violations": [],
+            "original_input": "",
+        }
+
+    latest_user_input = user_messages[-1].content
+
+    # init Gemini 2.0 Flash for guardrail validation
+    llm = ChatGoogleGenerativeAI(
+        model=configurable.query_generator_model,
+        temperature=0.1,  # Low temperature for consistent security decisions
+        max_retries=2,
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+    structured_llm = llm.with_structured_output(InputGuardrailResult)
+
+    # Format the prompt with user input
+    formatted_prompt = input_guardrail_instructions.format(user_input=latest_user_input)
+
+    # Validate the input
+    try:
+        result = structured_llm.invoke(formatted_prompt)
+
+        return {
+            "is_safe_input": result.is_safe,
+            "guardrail_violations": result.violations,
+            "original_input": latest_user_input,
+        }
+    except Exception as e:
+        # In case of error, err on the side of safety
+        print(f"InputGuardrail 오류 발생: {traceback.format_exc()}")
+        return {
+            "is_safe_input": False,
+            "guardrail_violations": ["시스템 오류로 인한 안전성 확인 불가"],
+            "original_input": latest_user_input,
+        }
+
+
+def route_after_guardrail(state: OverallState) -> str:
+    """LangGraph routing function that determines whether input is safe to proceed.
+
+    Routes based on guardrail validation result - either proceeds to query classification
+    or blocks the request with an error response.
+
+    Args:
+        state: Current graph state containing the guardrail validation result
+
+    Returns:
+        String literal indicating the next node to visit ("classify_query" or "guardrail_block")
+    """
+    if state["is_safe_input"]:
+        return "classify_query"
+    else:
+        return "guardrail_block"
+
+
+def guardrail_block(state: OverallState, config: RunnableConfig) -> OverallState:
+    """LangGraph node that handles blocked requests due to guardrail violations.
+
+    Provides a user-friendly response explaining why the request was blocked
+    without revealing specific security details.
+
+    Args:
+        state: Current graph state containing the guardrail violations
+        config: Configuration for the runnable
+
+    Returns:
+        Dictionary with state update, including a blocking message
+    """
+    # Create a user-friendly error message
+    block_message = """죄송합니다. 요청하신 내용이 다음과 같은 이유로 처리될 수 없습니다:
+
+🛡️ **보안 정책 위반 감지**
+
+안전하고 건전한 서비스 제공을 위해 다음과 같은 내용은 제한됩니다:
+• 시스템 보안을 우회하려는 시도
+• 차별적이거나 혐오적인 표현
+• 개인정보나 민감정보 요구
+• 불법적인 활동과 관련된 요청
+
+💡 **대신 이런 질문을 해보세요:**
+• 채널톡의 기능이나 사용법에 대한 문의
+• 일반적인 정보나 지식에 대한 질문
+• 건설적이고 도움이 되는 대화
+
+다시 한번 정중하고 적절한 질문으로 문의해 주시면 성심껏 도와드리겠습니다."""
+
+    return {
+        "messages": [AIMessage(content=block_message)],
+    }
+
+
 def classify_query(
     state: OverallState, config: RunnableConfig
 ) -> QueryClassificationState:
@@ -585,6 +704,8 @@ def evaluate_knowledge_search(
 builder = StateGraph(OverallState, config_schema=Configuration)
 
 # Define the nodes we will cycle between
+builder.add_node("input_guardrail", input_guardrail)
+builder.add_node("guardrail_block", guardrail_block)
 builder.add_node("classify_query", classify_query)
 builder.add_node("direct_answer", direct_answer)
 builder.add_node("generate_query", generate_query)
@@ -595,9 +716,19 @@ builder.add_node("generate_knowledge_query", generate_knowledge_query)
 builder.add_node("knowledge_search", knowledge_search)
 builder.add_node("knowledge_reflection", knowledge_reflection)
 
-# Set the entrypoint as `classify_query`
+# Set the entrypoint as `input_guardrail`
 # This means that this node is the first one called
-builder.add_edge(START, "classify_query")
+builder.add_edge(START, "input_guardrail")
+
+# Add conditional edge based on guardrail validation
+builder.add_conditional_edges(
+    "input_guardrail",
+    route_after_guardrail,
+    ["classify_query", "guardrail_block"],
+)
+
+# Guardrail block goes straight to END
+builder.add_edge("guardrail_block", END)
 
 # Add conditional edge based on query classification
 builder.add_conditional_edges(

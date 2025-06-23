@@ -23,6 +23,9 @@ class OverallState(TypedDict):
     needs_web_search: bool
     needs_knowledge_search: bool
     query_classification: str
+    is_safe_input: bool
+    guardrail_violations: Annotated[list[str], operator.add]
+    original_input: str
 
 
 class ReflectionState(TypedDict):
