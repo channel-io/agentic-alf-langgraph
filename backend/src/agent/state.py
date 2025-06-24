@@ -26,6 +26,10 @@ class OverallState(TypedDict):
     is_safe_input: bool
     guardrail_violations: Annotated[list[str], operator.add]
     original_input: str
+    is_clear_intent: bool
+    clarification_questions: Annotated[list[str], operator.add]
+    needs_clarification: bool
+    intent_clarify_count: int
 
 
 class ReflectionState(TypedDict):

@@ -50,3 +50,23 @@ class InputGuardrailResult(BaseModel):
         description="List of detected violations (empty if safe)."
     )
     reasoning: str = Field(description="Explanation of the guardrail decision.")
+
+
+class IntentClarityResult(BaseModel):
+    """Result of intent clarity analysis."""
+
+    is_clear: bool = Field(
+        description="Whether the user's intent is clear and specific enough."
+    )
+    needs_clarification: bool = Field(
+        description="Whether the query needs clarification questions."
+    )
+    ambiguity_type: str = Field(
+        description="Type of ambiguity: 'too_abstract', 'multiple_interpretations', 'missing_context', 'too_broad', 'unclear_target', or 'clear' if no ambiguity."
+    )
+    clarification_questions: list[str] = Field(
+        description="List of clarifying questions to ask the user (empty if clear)."
+    )
+    reasoning: str = Field(
+        description="Explanation of why clarification is or isn't needed."
+    )

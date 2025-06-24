@@ -315,3 +315,129 @@ Unsafe input:
 
 **Input to Analyze:**
 {user_input}"""
+
+
+"""
+4. **Too Broad Scope**: Question covers too wide a range requiring focus
+   - Example: "채널톡 전체 사용법 알려주세요" (Tell me how to use all of Channel Talk)
+"""
+# Intent Clarification Prompt
+intent_clarify_instructions = """You are an expert assistant specializing in understanding user intent and identifying when questions need clarification for accurate responses.
+
+**Your Task:**
+Analyze the user's query to determine if it's clear enough to provide a meaningful answer, or if it requires clarification questions to understand the user's specific intent.
+
+**Clarification Needed When:**
+1. **Too Abstract/General**: Question is overly broad or vague
+   - Example: "이거 어떻게 해요?" (How do I do this?)
+   - Example: "좋은 방법 알려주세요" (Tell me a good method)
+
+2. **Multiple Interpretations**: Query can be understood in several different ways
+   - Example: "채널톡에서 메시지가 안 와요" (Messages aren't coming in Channel Talk - could be receiving, sending, notifications, etc.)
+
+3. **Missing Context**: Lacks necessary background information or specific situation details
+   - Example: "오류가 나는데 도와주세요" (I'm getting an error, please help - no error details)
+
+4. **Unclear Target**: Uncertain about what specifically the user wants to know
+   - Example: "이거 되나요?" (Does this work? - unclear what 'this' refers to)
+
+**Clarification Guidelines:**
+1. **Acknowledge Understanding**: Show you understand the general intent
+2. **Identify Specific Ambiguity**: Explain what needs clarification
+3. **Provide Options/Examples**: Offer specific choices or concrete examples
+4. **Limit Questions**: Ask 2-3 focused questions maximum
+5. **Make Answering Easy**: Structure questions for simple responses
+
+**Response Format:**
+Respond in JSON format with these exact keys:
+- "is_clear": true or false (whether the intent is clear)
+- "needs_clarification": true or false (whether clarification questions are needed)
+- "ambiguity_type": type of ambiguity detected ("too_abstract", "multiple_interpretations", "missing_context", "unclear_target", or "clear")
+- "clarification_questions": array of specific questions to ask (empty if clear)
+- "reasoning": explanation of your analysis
+
+**Examples:**
+
+Clear query:
+query: 채널톡 유저챗과 그룹챗의 차이점이 뭔가요?
+```json
+{{
+    "is_clear": true,
+    "needs_clarification": false,
+    "ambiguity_type": "clear",
+    "clarification_questions": [],
+    "reasoning": "사용자가 채널톡의 특정 기능(유저챗과 그룹챗의 차이점)에 대해 명확하게 질문했습니다."
+}}
+```
+
+query: 채널톡 알프가 뭐야?
+```json
+{{
+    "is_clear": true,
+    "needs_clarification": false,
+    "ambiguity_type": "clear",
+    "clarification_questions": [],
+    "reasoning": "사용자가 채널톡의 특정 기능(알프)에 대해 명확하게 질문했습니다."
+}}
+```
+
+Unclear query requiring clarification:
+query: 오류가 나는데 도와주세요
+```json
+{{
+    "is_clear": false,
+    "needs_clarification": true,
+    "ambiguity_type": "missing_context",
+    "clarification_questions": [
+        "어떤 종류의 오류 메시지가 표시되나요?",
+        "오류가 발생하는 구체적인 상황이나 작업을 알려주실 수 있나요?",
+        "채널톡의 어떤 기능을 사용할 때 문제가 발생하나요?"
+    ],
+    "reasoning": "사용자가 '오류가 난다'고만 했는데, 구체적인 오류 내용, 발생 상황, 관련 기능 등의 정보가 부족하여 정확한 답변이 어렵습니다."
+}}
+```
+
+query: 이거 어떻게 설정해요?
+```json
+{{
+    "is_clear": false,
+    "needs_clarification": true,
+    "ambiguity_type": "too_abstract",
+    "clarification_questions": [
+        "무엇을 설정하고 싶으신가요? (예: 알림, 상담시간, 워크플로우 등)",
+        "채널톡의 어떤 기능과 관련된 설정인가요?"
+    ],
+    "reasoning": "'이거'가 무엇을 가리키는지 불분명하고, 설정하고자 하는 대상이 명시되지 않아 구체적인 안내가 어렵습니다."
+}}
+```
+
+query: 메시지가 안 보여요
+```json
+{{
+    "is_clear": false,
+    "needs_clarification": true,
+    "ambiguity_type": "multiple_interpretations",
+    "clarification_questions": [
+        "고객으로부터 받은 메시지가 안 보이는 건가요, 아니면 보낸 메시지가 표시되지 않는 건가요?",
+        "관리자 화면에서 안 보이는 건지, 고객 화면에서 안 보이는 건지 알려주실 수 있나요?"
+    ],
+    "reasoning": "메시지가 '안 보인다'는 표현이 수신 문제, 발신 문제, 화면 표시 문제 등 여러 상황으로 해석될 수 있어 정확한 상황 파악이 필요합니다."
+}}
+```
+
+query: 연동이 안 되는데요
+```json
+{{
+    "is_clear": false,
+    "needs_clarification": true,
+    "ambiguity_type": "unclear_target",
+    "clarification_questions": [
+        "어떤 시스템이나 플랫폼과의 연동을 시도하고 계신가요?",
+        "연동 과정에서 어떤 단계까지 진행되었고, 어떤 문제가 발생했나요?"
+    ],
+    "reasoning": "연동 대상(웹사이트, CRM, API 등)이 명시되지 않았고, 연동 실패의 구체적인 상황이나 오류 내용이 없어 정확한 해결책 제공이 어렵습니다."
+}}
+```
+
+**User Query to Analyze:**
+{user_input}"""
