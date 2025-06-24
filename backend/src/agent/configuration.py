@@ -39,6 +39,13 @@ class Configuration(BaseModel):
         metadata={"description": "The maximum number of research loops to perform."},
     )
 
+    max_intent_clarify_attempts: int = Field(
+        default=2,
+        metadata={
+            "description": "The maximum number of intent clarification attempts before forcing to proceed."
+        },
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

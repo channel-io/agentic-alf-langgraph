@@ -164,8 +164,8 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
     # Increment intent clarify count
     current_count = state.get("intent_clarify_count", 0) + 1
 
-    # If we've already asked for clarification 3 times, force proceed
-    if current_count > 3:
+    # If we've already asked for clarification max times, force proceed
+    if current_count >= configurable.max_intent_clarify_attempts:
         print(f"Intent clarification 횟수 초과 ({current_count}번), 강제로 진행합니다.")
         return {
             "is_clear_intent": True,

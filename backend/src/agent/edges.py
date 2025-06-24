@@ -44,7 +44,7 @@ def route_after_classification(state: QueryClassificationState) -> str:
         return "direct_answer"
 
 
-def route_after_intent_clarify_search(state: OverallState) -> str:
+def route_after_intent_clarify_search(state: OverallState, config) -> str:
     """LangGraph routing function that routes to appropriate search type after intent clarification.
 
     Determines whether to proceed with web search, knowledge search, or provide clarification
@@ -52,14 +52,18 @@ def route_after_intent_clarify_search(state: OverallState) -> str:
 
     Args:
         state: Current graph state containing the intent clarity and classification results
+        config: Configuration for the runnable, including max_intent_clarify_attempts setting
 
     Returns:
         String literal indicating the next node to visit
     """
+    from agent.configuration import Configuration
+
+    configurable = Configuration.from_runnable_config(config)
     current_count = state.get("intent_clarify_count", 0)
 
     # If we've reached the maximum clarification attempts, force proceed with search or direct answer
-    if current_count >= 3:
+    if current_count >= configurable.max_intent_clarify_attempts:
         print(
             f"Intent clarification 최대 횟수 도달 ({current_count}번), 검색으로 진행합니다."
         )
