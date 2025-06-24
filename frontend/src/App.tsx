@@ -73,6 +73,25 @@ export default function App() {
             exampleLabels || "N/A"
           }.`,
         };
+      } else if (event.classify_query) {
+        const needsWebSearch = event.classify_query?.needs_web_search || false;
+        const needsKnowledgeSearch = event.classify_query?.needs_knowledge_search || false;
+        
+        let searchTypeText = "";
+        if (needsWebSearch && needsKnowledgeSearch) {
+          searchTypeText = "🌐📚 Web + Knowledge Search";
+        } else if (needsWebSearch) {
+          searchTypeText = "🌐 Web Search";
+        } else if (needsKnowledgeSearch) {
+          searchTypeText = "📚 Knowledge Search";
+        } else {
+          searchTypeText = "💬 Direct Answer";
+        }
+        
+        processedEvent = {
+          title: "🔍 Query Classification",
+          data: `Target Node: ${searchTypeText}`,
+        };
       } else if (event.knowledge_search) {
         const results = event.knowledge_search.knowledge_search_result || [];
         const searchQuery = event.knowledge_search.search_query?.[0] || "";
@@ -82,16 +101,29 @@ export default function App() {
           data: `Searching: "${searchQuery}". Found ${numResults} relevant result${numResults !== 1 ? 's' : ''} in internal knowledge base.`,
         };
       } else if (event.reflection) {
+        const isSufficient = event.reflection.is_sufficient || false;
+        const knowledgeGap = event.reflection.knowledge_gap || "No gap identified";
+        const followUpQueries = event.reflection.follow_up_queries || [];
+        
+        // Array를 문자열로 변환
+        const queriesText = Array.isArray(followUpQueries) 
         processedEvent = {
           title: "Reflection",
-          data: "Analysing Web Research Results",
+          data: `Analysing Web Research Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}. \nFollow-up Queries: ${queriesText}`,
         };
       } else if (event.knowledge_reflection) {
-        const knowledgeGap = event.knowledge_reflection.knowledge_gap;
-        const followUpQueries = event.knowledge_reflection.follow_up_queries;
+        const isSufficient = event.knowledge_reflection.is_sufficient || false;
+        const knowledgeGap = event.knowledge_reflection.knowledge_gap || "No gap identified";
+        const followUpQueries = event.knowledge_reflection.follow_up_queries || [];
+        
+        // Array를 문자열로 변환
+        const queriesText = Array.isArray(followUpQueries) 
+          ? followUpQueries.join(", ") 
+          : followUpQueries?.toString() || "No follow-up queries";
+          
         processedEvent = {
           title: "Knowledge Reflection",
-          data: `Analysing Knowledge Search Results: ${knowledgeGap}. Follow-up Queries: ${followUpQueries}`,
+          data: `Analysing Knowledge Search Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}. \nFollow-up Queries: ${queriesText}`,
         };
       } else if (event.finalize_answer) {
         processedEvent = {
