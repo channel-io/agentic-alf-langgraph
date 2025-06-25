@@ -41,6 +41,8 @@ from agent.utils import (
     get_research_topic,
     insert_citation_markers,
     resolve_urls,
+    format_conversation_history,
+    get_latest_user_message,
 )
 
 # Used for Google Search API
@@ -88,8 +90,11 @@ def input_guardrail(state: OverallState, config: RunnableConfig) -> OverallState
     )
     structured_llm = llm.with_structured_output(InputGuardrailResult)
 
-    # Format the prompt with user input
-    formatted_prompt = input_guardrail_instructions.format(user_input=latest_user_input)
+    # Format the prompt with user input and conversation history
+    conversation_history = format_conversation_history(state["messages"])
+    formatted_prompt = input_guardrail_instructions.format(
+        user_input=latest_user_input, conversation_history=conversation_history
+    )
 
     # Validate the input
     try:
@@ -99,6 +104,7 @@ def input_guardrail(state: OverallState, config: RunnableConfig) -> OverallState
             "is_safe_input": result.is_safe,
             "guardrail_violations": result.violations,
             "original_input": latest_user_input,
+            "messages": state["messages"],
         }
     except Exception as e:
         # In case of error, err on the side of safety
@@ -107,6 +113,7 @@ def input_guardrail(state: OverallState, config: RunnableConfig) -> OverallState
             "is_safe_input": False,
             "guardrail_violations": ["시스템 오류로 인한 안전성 확인 불가"],
             "original_input": latest_user_input,
+            "messages": state["messages"],
         }
 
 
@@ -143,6 +150,7 @@ def guardrail_block(state: OverallState, config: RunnableConfig) -> OverallState
 
     return {
         "messages": [AIMessage(content=block_message)],
+        "search_query": [],  # reset search query
     }
 
 
@@ -172,6 +180,7 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
             "needs_clarification": False,
             "clarification_questions": [],
             "intent_clarify_count": current_count,
+            "messages": state["messages"],
         }
 
     # Extract the latest user message
@@ -187,6 +196,7 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
                 "어떤 것을 도와드릴까요? 구체적으로 질문해주세요."
             ],
             "intent_clarify_count": current_count,
+            "messages": state["messages"],
         }
 
     latest_user_input = user_messages[-1].content
@@ -200,8 +210,11 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
     )
     structured_llm = llm.with_structured_output(IntentClarityResult)
 
-    # Format the prompt with user input
-    formatted_prompt = intent_clarify_instructions.format(user_input=latest_user_input)
+    # Format the prompt with user input and conversation history
+    conversation_history = format_conversation_history(state["messages"])
+    formatted_prompt = intent_clarify_instructions.format(
+        user_input=latest_user_input, conversation_history=conversation_history
+    )
 
     # Analyze the intent clarity
     try:
@@ -212,6 +225,7 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
             "needs_clarification": result.needs_clarification,
             "clarification_questions": result.clarification_questions,
             "intent_clarify_count": current_count,
+            "messages": state["messages"],
         }
     except Exception as e:
         # In case of error, assume clarification is needed for safety
@@ -223,6 +237,7 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
                 "죄송합니다. 질문을 더 자세히 설명해 주실 수 있나요?"
             ],
             "intent_clarify_count": current_count,
+            "messages": state["messages"],
         }
 
 
@@ -281,6 +296,7 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
     return {
         "messages": [AIMessage(content=clarification_message)],
         "intent_clarify_count": current_count,
+        "search_query": [],  # reset search query
     }
 
 
@@ -312,9 +328,11 @@ def classify_query(
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = query_classification_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
+        conversation_history=conversation_history,
     )
 
     # Classify the query
@@ -324,6 +342,7 @@ def classify_query(
         "needs_web_search": result.needs_web_search,
         "needs_knowledge_search": result.needs_knowledge_search,
         "query_classification": result.query_type,
+        "messages": state["messages"],
     }
 
 
@@ -345,9 +364,11 @@ def direct_answer(state: OverallState, config: RunnableConfig) -> OverallState:
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = direct_answer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
+        conversation_history=conversation_history,
     )
 
     # init LLM for direct answer
@@ -362,6 +383,7 @@ def direct_answer(state: OverallState, config: RunnableConfig) -> OverallState:
 
     return {
         "messages": [AIMessage(content=result.content)],
+        "search_query": [],  # reset search query
     }
 
 
@@ -395,14 +417,16 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = query_writer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         number_queries=state["initial_search_query_count"],
+        conversation_history=conversation_history,
     )
     # Generate the search queries
     result = structured_llm.invoke(formatted_prompt)
-    return {"search_query": result.query}
+    return {"search_query": result.query, "messages": state["messages"]}
 
 
 def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
@@ -419,9 +443,12 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     """
     # Configure
     configurable = Configuration.from_runnable_config(config)
+    # Get conversation history from the state messages
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = web_searcher_instructions.format(
         current_date=get_current_date(),
         research_topic=state["search_query"],
+        conversation_history=conversation_history,
     )
 
     # Uses the google genai client as the langchain client doesn't return grounding metadata
@@ -470,10 +497,12 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = reflection_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["web_research_result"]),
+        conversation_history=conversation_history,
     )
     # init Reasoning Model
     llm = ChatGoogleGenerativeAI(
@@ -490,10 +519,11 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
         "follow_up_queries": result.follow_up_queries,
         "research_loop_count": state["research_loop_count"],
         "number_of_ran_queries": len(state["search_query"]),
+        "messages": state["messages"],
     }
 
 
-def finalize_answer(state: OverallState, config: RunnableConfig):
+def finalize_answer(state: OverallState, config: RunnableConfig) -> OverallState:
     """LangGraph node that finalizes the research summary.
 
     Prepares the final output by deduplicating and formatting sources, then
@@ -518,10 +548,12 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = answer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         summaries="\n---\n\n".join(all_summaries),
+        conversation_history=conversation_history,
     )
 
     # init Reasoning Model, default to Gemini 2.5 Flash
@@ -546,6 +578,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     return {
         "messages": [AIMessage(content=result.content)],
         "sources_gathered": unique_sources,
+        "search_query": [],  # reset search query
     }
 
 
@@ -581,14 +614,16 @@ def generate_knowledge_query(
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = knowledge_query_writer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         number_queries=state["initial_search_query_count"],
+        conversation_history=conversation_history,
     )
     # Generate the search queries
     result = structured_llm.invoke(formatted_prompt)
-    return {"search_query": result.query}
+    return {"search_query": result.query, "messages": state["messages"]}
 
 
 def knowledge_search(
@@ -653,10 +688,12 @@ def knowledge_reflection(
 
     # Format the prompt
     current_date = get_current_date()
+    conversation_history = format_conversation_history(state["messages"])
     formatted_prompt = knowledge_reflection_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["knowledge_search_result"]),
+        conversation_history=conversation_history,
     )
     # init Reasoning Model
     llm = ChatGoogleGenerativeAI(
@@ -673,4 +710,5 @@ def knowledge_reflection(
         "follow_up_queries": result.follow_up_queries,
         "research_loop_count": state["research_loop_count"],
         "number_of_ran_queries": len(state["search_query"]),
+        "messages": state["messages"],
     }

@@ -8,6 +8,9 @@ def get_current_date():
 
 query_writer_instructions = """Your goal is to generate sophisticated and diverse web search queries. These queries are intended for an advanced automated web research tool capable of analyzing complex results, following links, and synthesizing information.
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - Always prefer a single search query, only add another query if the original question requests multiple aspects or elements and one query is not enough.
 - Each query should focus on one specific aspect of the original question.
@@ -15,6 +18,7 @@ Instructions:
 - Queries should be diverse, if the topic is broad, generate more than 1 query.
 - Don't generate multiple similar queries, 1 is enough.
 - Query should ensure that the most current information is gathered. The current date is {current_date}.
+- Consider the conversation context and previous questions to generate more relevant and targeted queries.
 
 Format: 
 - Format your response as a JSON object with ALL two of these exact keys:
@@ -36,31 +40,22 @@ Context: {research_topic}"""
 
 knowledge_query_writer_instructions = """Your goal is to generate sophisticated and search-optimized queries for Channel Talk's internal knowledge base. Create standalone queries that can effectively retrieve relevant documentation, guides, and service information.
 
+Previous Conversation Context:
+{conversation_history}
+
 Query Strategy Instructions:
 1. **Standalone Queries**: Each query must be self-contained and understandable without context
 2. **Query Decomposition**: If the question has multiple intents or aspects, break it down into separate focused queries
 3. **Query Expansion**: If the query is too specific or abstract, expand it to include related terms and synonyms
 4. **Maximum 3 Queries**: Generate 1-3 queries based on complexity and scope
+5. **Context Awareness**: Consider the conversation history to understand ongoing topics and generate more relevant queries
 
 Query Optimization Guidelines:
-- Use Channel Talk specific terminology 
-    - 팀챗, 유저챗, 그룹챗
-    - 상담, 상담톡, 상담 태그, 알림톡
-    - 고객센터
-    - 계정 인증, 로그인, 로그아웃
-    - 워크플로우
-    - 도큐먼트, FAQ
-    - 알프(ALF)
-    - 미트
-    - IVR
-    - 플랜, 요금제, 구독
-    - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버 등)
-    - 고객 연락처, 고객 정보
-    - etc ...
 - Include both Korean and English terms when relevant
 - Add synonyms and related concepts for better coverage
 - Focus on actionable keywords (설정, 사용법, 기능, 차이점, 방법, etc.)
 - Consider different user intents (how-to, troubleshooting, comparison, configuration)
+- Reference previous questions or topics discussed to provide continuity
 
 Query Selection Rules:
 - 1 Query: For simple, focused questions with single intent
@@ -96,27 +91,16 @@ Context: {research_topic}"""
 
 web_searcher_instructions = """Conduct targeted Google Searches to gather the most recent, credible information on "{research_topic}" and synthesize it into a verifiable text artifact.
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - Query should ensure that the most current information is gathered. The current date is {current_date}.
 - Conduct multiple, diverse searches to gather comprehensive information.
 - Consolidate key findings while meticulously tracking the source(s) for each specific piece of information.
 - The output should be a well-written summary or report based on your search findings. 
 - Only include the information found in the search results, don't make up any information.
-
-Research Topic:
-{research_topic}
-"""
-
-
-knowledge_searcher_instructions = """Conduct targeted searches in the Channel Talk internal knowledge base to gather relevant information about "{research_topic}" and synthesize it into a comprehensive response.
-
-Instructions:
-- Search for Channel Talk specific features, functionalities, and service information.
-- Consolidate key findings from the internal knowledge base.
-- The output should be a well-written summary based on your search findings from Channel Talk documentation.
-- Only include the information found in the search results, don't make up any information.
-- Focus on providing accurate Channel Talk service information.
-- Use Korean terms and explanations when appropriate for better understanding.
+- Consider the conversation context and any previous questions or topics to provide more targeted and relevant search results.
 
 Research Topic:
 {research_topic}
@@ -125,14 +109,19 @@ Research Topic:
 
 reflection_instructions = """You are an expert research assistant analyzing summaries about "{research_topic}".
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - Identify knowledge gaps or areas that need deeper exploration and generate a follow-up query. (1 or multiple).
 - If provided summaries are sufficient to answer the user's question, don't generate a follow-up query.
 - If there is a knowledge gap, generate a follow-up query that would help expand your understanding.
 - Focus on technical details, implementation specifics, or emerging trends that weren't fully covered.
+- Consider the conversation history to understand the user's ongoing interests and information needs.
 
 Requirements:
 - Ensure the follow-up query is self-contained and includes necessary context for web search.
+- Take into account previous questions and answers to avoid redundancy and build upon established knowledge.
 
 Output Format:
 - Format your response as a JSON object with these exact keys:
@@ -158,15 +147,20 @@ Summaries:
 
 knowledge_reflection_instructions = """You are an expert research assistant analyzing Channel Talk knowledge search results about "{research_topic}".
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - Identify knowledge gaps or areas that need deeper exploration in Channel Talk service documentation and generate a follow-up query. (1 or multiple).
 - If provided knowledge search results are sufficient to answer the user's Channel Talk related question, don't generate a follow-up query.
 - If there is a knowledge gap, generate a follow-up query that would help expand your understanding of Channel Talk features or services.
 - Focus on Channel Talk specific details, feature explanations, or service configurations that weren't fully covered.
+- Consider the conversation history to understand the context and provide more relevant follow-up questions.
 
 Requirements:
 - Ensure the follow-up query is self-contained and includes necessary context for Channel Talk knowledge search.
 - Use Korean keywords when appropriate for better search results in Channel Talk documentation.
+- Reference the conversation flow to provide continuity and build upon previously discussed topics.
 
 Output Format:
 - Format your response as a JSON object with these exact keys:
@@ -192,16 +186,21 @@ Knowledge Search Results:
 
 answer_instructions = """Generate a high-quality answer to the user's question based on the provided summaries from web search and/or knowledge search results.
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - The current date is {current_date}.
 - You are the final step of a multi-step research process, don't mention that you are the final step. 
 - You have access to all the information gathered from the previous steps.
-- You have access to the user's question.
+- You have access to the user's question and the entire conversation history.
 - Generate a high-quality answer to the user's question based on the provided summaries and the user's question.
+- Consider the conversation context to provide continuity and reference previous discussions when relevant.
 - If the summaries contain web search results, include the sources correctly using markdown format (e.g. [apnews](https://vertexaisearch.cloud.google.com/id/1-0)).
 - If the summaries contain Channel Talk knowledge search results, include the sources correctly using markdown format (e.g. [title](#)). THIS IS A MUST.
 - If the summaries contain Channel Talk knowledge search results, provide accurate Channel Talk service information and use Korean explanations when appropriate.
 - Focus on practical usage and features when answering Channel Talk related questions.
+- Build upon previous parts of the conversation and acknowledge any follow-up questions or clarifications from the user.
 
 User Context:
 - {research_topic}
@@ -212,6 +211,9 @@ Summaries:
 
 query_classification_instructions = """Analyze the user's query and determine if it requires web search for current/real-time information, internal knowledge search for Channel Talk service information, or can be answered directly.
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - The current date is {current_date}.
 - Classify queries that need web search: current events, recent news, latest prices, real-time data, breaking news, stock prices, weather, sports scores, new product releases, recent developments, etc.
@@ -219,6 +221,7 @@ Instructions:
 - Classify queries that DON'T need search: general knowledge, basic facts, explanations of concepts (not related to Channel Talk), historical information, math problems, coding help (general), personal opinions, smalltalk, greetings, etc.
 - Consider if the query explicitly mentions "Channel Talk", "채널톡", or asks about customer service, chat service, or related features.
 - Be conservative: when in doubt about whether current information is needed, lean towards NOT requiring web search for general knowledge queries.
+- Consider the conversation history to understand the context and ongoing topics that might influence classification.
 
 Query Types:
 - smalltalk: Casual conversation, greetings, how are you, etc.
@@ -229,7 +232,22 @@ Query Types:
 - historical: Past events, established historical facts
 - technical: Programming, math, science concepts (unless asking for latest versions/updates)
 - channel_talk_service: Channel Talk features, usage, configuration, API, troubleshooting
+    - Channel Talk specific terminology 
+        - 팀챗, 유저챗, 그룹챗
+        - 상담, 상담톡, 상담 태그, 알림톡
+        - 고객센터
+        - 계정 인증, 로그인, 로그아웃
+        - 워크플로우
+        - 도큐먼트, FAQ
+        - 알프(ALF)
+        - 미트
+        - IVR
+        - 플랜, 요금제, 구독
+        - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버 등)
+        - 고객 연락처, 고객 정보
+        - etc ...
 
+    
 Format your response as a JSON object with these exact keys:
 - "needs_web_search": true or false
 - "needs_knowledge_search": true or false  
@@ -251,6 +269,9 @@ User Query: {research_topic}"""
 
 direct_answer_instructions = """Provide a helpful and informative direct answer to the user's query without using web search.
 
+Previous Conversation Context:
+{conversation_history}
+
 Instructions:
 - The current date is {current_date}.
 - Use your general knowledge to provide a comprehensive answer.
@@ -259,12 +280,17 @@ Instructions:
 - For technical questions, provide clear explanations with examples if appropriate.
 - If you're not certain about specific details that might change over time, acknowledge this limitation.
 - Keep your response focused and relevant to the user's question.
+- Consider the conversation history to provide continuity and build upon previous discussions.
+- Reference earlier topics in the conversation when relevant to provide a cohesive experience.
 
 User Query: {research_topic}"""
 
 
 # InputGuardrail Prompt
 input_guardrail_instructions = """You are a security-focused AI specializing in input validation. Your task is to detect violations across the following critical categories:
+
+Previous Conversation Context:
+{conversation_history}
 
 **Primary Security Checks:**
 
@@ -337,8 +363,11 @@ Unsafe input:
 # Intent Clarification Prompt
 intent_clarify_instructions = """You are an expert assistant specializing in understanding user intent and identifying when questions need clarification for accurate responses.
 
+Previous Conversation Context:
+{conversation_history}
+
 **Your Task:**
-Analyze the user's query to determine if it's clear enough to provide a meaningful answer, or if it requires clarification questions to understand the user's specific intent.
+Analyze the user's query to determine if it's clear enough to provide a meaningful answer, or if it requires clarification questions to understand the user's specific intent. Consider the conversation history to understand the context and ongoing discussion.
 
 **Clarification Needed When:**
 1. **Too Abstract/General**: Question is overly broad or vague
@@ -372,7 +401,7 @@ Respond in JSON format with these exact keys:
 **Examples:**
 
 Clear query:
-query: 채널톡 유저챗과 그룹챗의 차이점이 뭔가요?
+query: 유저챗과 그룹챗의 차이점이 뭔가요?
 ```json
 {{
     "is_clear": true,
@@ -395,6 +424,21 @@ query: 채널톡 알프가 뭐야?
 ```
 
 Unclear query requiring clarification:
+query: 테슬라
+```json
+{{
+    "is_clear": false,
+    "needs_clarification": true,
+    "ambiguity_type": "unclear_target",
+    "clarification_questions": [
+        "테슬라 차량에 대해 무엇을 알고 싶으신가요?",
+        "테슬라 차량의 특징이나 성능에 대해 궁금한 점이 있나요?",
+        "테슬라 차량과 관련된 다른 정보를 알고 싶으신가요?"
+    ],
+    "reasoning": "사용자가 '테슬라'라고만 했는데, 테슬라 차량에 대해 무엇을 알고 싶으신지 불분명하여 정확한 답변이 어렵습니다."
+}}
+```
+
 query: 오류가 나는데 도와주세요
 ```json
 {{

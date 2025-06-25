@@ -92,6 +92,7 @@ class WebSearchState(TypedDict):
 
     search_query: str
     id: str
+    messages: Annotated[list, add_messages]
 
 
 class KnowledgeSearchState(TypedDict):
@@ -99,6 +100,7 @@ class KnowledgeSearchState(TypedDict):
 
     search_query: str
     id: str
+    messages: Annotated[list, add_messages]
 
 
 @dataclass(kw_only=True)

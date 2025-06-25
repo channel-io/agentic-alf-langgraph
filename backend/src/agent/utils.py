@@ -19,6 +19,65 @@ def get_research_topic(messages: List[AnyMessage]) -> str:
     return research_topic
 
 
+def format_conversation_history(messages: List[AnyMessage]) -> str:
+    """
+    Format the conversation history for better context understanding.
+
+    Args:
+        messages: List of messages from the conversation
+
+    Returns:
+        Formatted conversation history string
+    """
+    if not messages:
+        return "No previous conversation context."
+
+    if len(messages) == 1:
+        return f"Current user query: {messages[-1].content}"
+
+    # Format the conversation history
+    formatted_history = []
+    for i, message in enumerate(messages):
+        if isinstance(message, HumanMessage):
+            formatted_history.append(f"User: {message.content}")
+        elif isinstance(message, AIMessage):
+            formatted_history.append(f"Assistant: {message.content}")
+
+    # Join with newlines and add context
+    conversation_context = "\n".join(formatted_history)
+
+    # Add summary context for longer conversations
+    if len(messages) > 6:  # More than 3 exchanges
+        conversation_context = f"""Recent conversation history:
+{conversation_context}
+
+Note: This is an ongoing conversation. Consider the context and continuity when generating responses."""
+    else:
+        conversation_context = f"""Conversation history:
+{conversation_context}"""
+
+    return conversation_context
+
+
+def get_latest_user_message(messages: List[AnyMessage]) -> str:
+    """
+    Get the latest user message from the conversation.
+
+    Args:
+        messages: List of messages from the conversation
+
+    Returns:
+        The content of the latest user message
+    """
+    # Find the last human message
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            return message.content
+
+    # If no human message found, return empty string
+    return ""
+
+
 def resolve_urls(urls_to_resolve: List[Any], id: int) -> Dict[str, str]:
     """
     Create a map of the vertex ai search urls (very long) to a short url with a unique id for each url.

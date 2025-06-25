@@ -89,30 +89,44 @@ def route_after_intent_clarify_search(state: OverallState, config) -> str:
         return "direct_answer"
 
 
-def continue_to_web_research(state: QueryGenerationState):
+def continue_to_web_research(state: OverallState):
     """LangGraph node that sends the search queries to the web research node.
 
     This is used to spawn n number of web research nodes, one for each search query.
     """
     return [
-        Send("web_research", {"search_query": search_query, "id": int(idx)})
+        Send(
+            "web_research",
+            {
+                "search_query": search_query,
+                "id": int(idx),
+                "messages": state["messages"],
+            },
+        )
         for idx, search_query in enumerate(state["search_query"])
     ]
 
 
-def continue_to_knowledge_search(state: QueryGenerationState):
+def continue_to_knowledge_search(state: OverallState):
     """LangGraph node that sends the search queries to the knowledge search node.
 
     This is used to spawn n number of knowledge search nodes, one for each search query.
     """
     return [
-        Send("knowledge_search", {"search_query": search_query, "id": int(idx)})
+        Send(
+            "knowledge_search",
+            {
+                "search_query": search_query,
+                "id": int(idx),
+                "messages": state["messages"],
+            },
+        )
         for idx, search_query in enumerate(state["search_query"])
     ]
 
 
 def evaluate_research(
-    state: ReflectionState,
+    state: OverallState,
     config,
 ) -> OverallState:
     """LangGraph routing function that determines the next step in the research flow.
@@ -142,6 +156,7 @@ def evaluate_research(
                 {
                     "search_query": follow_up_query,
                     "id": state["number_of_ran_queries"] + int(idx),
+                    "messages": state["messages"],
                 },
             )
             for idx, follow_up_query in enumerate(state["follow_up_queries"])
@@ -149,7 +164,7 @@ def evaluate_research(
 
 
 def evaluate_knowledge_search(
-    state: ReflectionState,
+    state: OverallState,
     config,
 ) -> OverallState:
     """LangGraph routing function that determines the next step in the knowledge search flow.
@@ -179,6 +194,7 @@ def evaluate_knowledge_search(
                 {
                     "search_query": follow_up_query,
                     "id": state["number_of_ran_queries"] + int(idx),
+                    "messages": state["messages"],
                 },
             )
             for idx, follow_up_query in enumerate(state["follow_up_queries"])
