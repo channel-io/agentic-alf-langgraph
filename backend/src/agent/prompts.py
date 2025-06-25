@@ -43,7 +43,20 @@ Query Strategy Instructions:
 4. **Maximum 3 Queries**: Generate 1-3 queries based on complexity and scope
 
 Query Optimization Guidelines:
-- Use Channel Talk specific terminology (채널톡, 유저챗, 그룹챗, 상담, 고객센터, 워크플로우, 도큐먼트, 알프(ALF), 메신저, 미트, etc.)
+- Use Channel Talk specific terminology 
+    - 팀챗, 유저챗, 그룹챗
+    - 상담, 상담톡, 상담 태그, 알림톡
+    - 고객센터
+    - 계정 인증, 로그인, 로그아웃
+    - 워크플로우
+    - 도큐먼트, FAQ
+    - 알프(ALF)
+    - 미트
+    - IVR
+    - 플랜, 요금제, 구독
+    - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버 등)
+    - 고객 연락처, 고객 정보
+    - etc ...
 - Include both Korean and English terms when relevant
 - Add synonyms and related concepts for better coverage
 - Focus on actionable keywords (설정, 사용법, 기능, 차이점, 방법, etc.)

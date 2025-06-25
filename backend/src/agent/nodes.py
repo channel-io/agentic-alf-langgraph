@@ -162,10 +162,10 @@ def intent_clarify(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
     # Increment intent clarify count
-    current_count = state.get("intent_clarify_count", 0) + 1
+    current_count = state.get("intent_clarify_count", 0)
 
     # If we've already asked for clarification max times, force proceed
-    if current_count >= configurable.max_intent_clarify_attempts:
+    if current_count >= configurable.max_intent_clarify_attempts + 1:
         print(f"Intent clarification 횟수 초과 ({current_count}번), 강제로 진행합니다.")
         return {
             "is_clear_intent": True,
@@ -239,12 +239,14 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
     Returns:
         Dictionary with state update, including a clarification message
     """
+
+    configurable = Configuration.from_runnable_config(config)
+
     clarification_questions = state.get("clarification_questions", [])
-    current_count = state.get("intent_clarify_count", 0)
+    current_count = state.get("intent_clarify_count", 0) + 1
 
     # Build the clarification message
-    if current_count >= 2:
-        # Add urgency message for later attempts
+    if current_count >= configurable.max_intent_clarify_attempts + 1:
         clarification_message = """질문해 주셔서 감사합니다! 더 정확한 답변을 위해 마지막으로 한 번 더 확인하고 싶습니다.
 
 🤔 **꼭 확인하고 싶은 점:**
@@ -260,7 +262,7 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
     for i, question in enumerate(clarification_questions, 1):
         clarification_message += f"{i}. {question}\n"
 
-    if current_count >= 2:
+    if current_count >= configurable.max_intent_clarify_attempts + 1:
         clarification_message += """
 ⚡ **간단하게라도 알려주세요:**
 • 어떤 기능이나 상황에 대한 질문인지
@@ -278,6 +280,7 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
 
     return {
         "messages": [AIMessage(content=clarification_message)],
+        "intent_clarify_count": current_count,
     }
 
 
