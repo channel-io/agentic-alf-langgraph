@@ -38,7 +38,7 @@ Topic: What revenue grew more last year apple stock or the number of people buyi
 Context: {research_topic}"""
 
 
-knowledge_query_writer_instructions = """Your goal is to generate sophisticated and search-optimized queries for Channel Talk's internal knowledge base. Create standalone queries that can effectively retrieve relevant documentation, guides, and service information.
+knowledge_query_writer_instructions = """Your goal is to generate sophisticated and search-optimized queries for internal knowledge base search. Create standalone queries that can effectively retrieve relevant documentation, guides, and service information from the organization's knowledge repository.
 
 Previous Conversation Context:
 {conversation_history}
@@ -51,11 +51,12 @@ Query Strategy Instructions:
 5. **Context Awareness**: Consider the conversation history to understand ongoing topics and generate more relevant queries
 
 Query Optimization Guidelines:
-- Include both Korean and English terms when relevant
+- Include both technical and business terminology when relevant
 - Add synonyms and related concepts for better coverage
-- Focus on actionable keywords (설정, 사용법, 기능, 차이점, 방법, etc.)
-- Consider different user intents (how-to, troubleshooting, comparison, configuration)
+- Focus on actionable keywords (설정, 구성, 사용법, 기능, 차이점, 방법, 가이드, 절차, etc.)
+- Consider different user intents (how-to, troubleshooting, comparison, configuration, best practices)
 - Reference previous questions or topics discussed to provide continuity
+- Use domain-specific terminology relevant to the organization's services and products
 
 Query Selection Rules:
 - 1 Query: For simple, focused questions with single intent
@@ -65,24 +66,24 @@ Query Selection Rules:
 
 Format: 
 - Format your response as a JSON object with these exact keys:
-   - "rationale": Explain your query strategy and why these queries optimize Channel Talk knowledge search
+   - "rationale": Explain your query strategy and why these queries optimize internal knowledge base search
    - "query": Array of 1-3 search-optimized queries
 
 Examples:
 
-Topic: 채널톡에서 유저챗과 그룹챗의 차이점이 뭔가요?
+Topic: 사용자 계정 관리와 권한 설정의 차이점이 뭔가요?
 ```json
 {{
-    "rationale": "This question requires decomposition into comparison aspects. Query 1 focuses on feature differences, Query 2 on use cases and scenarios, and Query 3 on technical implementation differences for comprehensive coverage.",
-    "query": ["유저챗 그룹챗 기능 차이점 비교", "개인상담 그룹상담 사용 시나리오 활용법", "1:1채팅 그룹채팅 설정 관리 방법"]
+    "rationale": "This question requires decomposition into comparison aspects. Query 1 focuses on account management features, Query 2 on permission systems, and Query 3 on implementation differences for comprehensive coverage.",
+    "query": ["사용자 계정 관리 기능 설정 방법", "권한 설정 역할 관리 시스템", "계정 권한 차이점 비교 가이드"]
 }}
 ```
 
-Topic: 채널톡 API 사용법
+Topic: API 연동 가이드
 ```json
 {{
-    "rationale": "Expanding the abstract 'API 사용법' query to cover different aspects: integration setup, authentication, and practical examples with related terminology for better knowledge base coverage.",
-    "query": ["채널톡 API 연동 설정 방법", "API 인증 토큰 키 발급", "웹훅 REST API 예제 사용 가이드"]
+    "rationale": "Expanding the general 'API 연동 가이드' query to cover different aspects: integration setup, authentication, and practical examples with related terminology for better knowledge base coverage.",
+    "query": ["API 연동 설정 구성 방법", "API 인증 토큰 키 발급 절차", "웹훅 REST API 구현 예제 가이드"]
 }}
 ```
 
@@ -113,71 +114,107 @@ Previous Conversation Context:
 {conversation_history}
 
 Instructions:
-- Identify knowledge gaps or areas that need deeper exploration and generate a follow-up query. (1 or multiple).
+- Identify knowledge gaps or areas that need deeper exploration and generate search-optimized follow-up queries.
 - If provided summaries are sufficient to answer the user's question, don't generate a follow-up query.
-- If there is a knowledge gap, generate a follow-up query that would help expand your understanding.
+- If there is a knowledge gap, generate follow-up queries that are optimized for web search engines.
 - Focus on technical details, implementation specifics, or emerging trends that weren't fully covered.
 - Consider the conversation history to understand the user's ongoing interests and information needs.
 
+Follow-up Query Optimization Guidelines (based on web search best practices):
+- Generate 1-3 focused queries maximum, avoiding similar or duplicate queries
+- Each query should target a specific aspect of the knowledge gap
+- Ensure queries are current and include temporal context when relevant (current date is {current_date})
+- Use specific, searchable keywords and terminology
+- Structure queries to retrieve the most recent and credible information
+- Make queries standalone and self-contained for effective web search
+- Consider diverse search angles to gather comprehensive information
+
 Requirements:
-- Ensure the follow-up query is self-contained and includes necessary context for web search.
-- Take into account previous questions and answers to avoid redundancy and build upon established knowledge.
+- Ensure follow-up queries are optimized for search engines and information retrieval
+- Include necessary context and specific keywords for targeted results
+- Take into account previous questions and answers to avoid redundancy and build upon established knowledge
+- Prioritize queries that would yield actionable, verifiable information
 
 Output Format:
 - Format your response as a JSON object with these exact keys:
    - "is_sufficient": true or false
    - "knowledge_gap": Describe what information is missing or needs clarification
-   - "follow_up_queries": Write a specific question to address this gap
+   - "follow_up_queries": Array of 1-3 search-optimized queries to address knowledge gaps
 
 Example:
 ```json
 {{
-    "is_sufficient": true, // or false
-    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
-    "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"] // [] if is_sufficient is true
+    "is_sufficient": false,
+    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks for the specific technology",
+    "follow_up_queries": [
+        "latest performance benchmarks [specific technology] 2024",
+        "[specific technology] speed comparison metrics industry standards",
+        "real-world performance testing results [specific technology] current"
+    ]
 }}
 ```
 
-Reflect carefully on the Summaries to identify knowledge gaps and produce a follow-up query. Then, produce your output following this JSON format:
+Reflect carefully on the Summaries to identify knowledge gaps and produce search-optimized follow-up queries. Then, produce your output following this JSON format:
 
 Summaries:
 {summaries}
 """
 
 
-knowledge_reflection_instructions = """You are an expert research assistant analyzing Channel Talk knowledge search results about "{research_topic}".
+knowledge_reflection_instructions = """You are an expert research assistant analyzing internal knowledge search results about "{research_topic}".
 
 Previous Conversation Context:
 {conversation_history}
 
 Instructions:
-- Identify knowledge gaps or areas that need deeper exploration in Channel Talk service documentation and generate a follow-up query. (1 or multiple).
-- If provided knowledge search results are sufficient to answer the user's Channel Talk related question, don't generate a follow-up query.
-- If there is a knowledge gap, generate a follow-up query that would help expand your understanding of Channel Talk features or services.
-- Focus on Channel Talk specific details, feature explanations, or service configurations that weren't fully covered.
+- Identify knowledge gaps or areas that need deeper exploration in the organization's knowledge base and generate search-optimized follow-up queries.
+- If provided knowledge search results are sufficient to answer the user's question, don't generate a follow-up query.
+- If there is a knowledge gap, generate follow-up queries that are optimized for internal knowledge base search.
+- Focus on service-specific details, feature explanations, or system configurations that weren't fully covered.
 - Consider the conversation history to understand the context and provide more relevant follow-up questions.
 
+Follow-up Query Optimization Guidelines (based on knowledge search best practices):
+- Generate 1-3 focused queries maximum, ensuring diversity and avoiding similar queries
+- Each query should target a specific aspect of the knowledge gap
+- Use relevant technical and business terminology for comprehensive search coverage
+- Include domain-specific terminology and synonyms for better knowledge base coverage
+- Structure queries with actionable keywords (설정, 구성, 사용법, 기능, 차이점, 방법, 연동, 해결, 가이드, 절차, etc.)
+- Consider different user intents (how-to, troubleshooting, comparison, configuration, best practices)
+- Make queries standalone and self-contained with necessary context
+- Focus on practical usage scenarios and specific organizational features
+
+Knowledge Base Query Enhancement Strategies:
+- Include service-specific terms relevant to the organization's domain
+- Add implementation keywords: 설정 방법, 연동 절차, 사용법, 기능 설명, 문제 해결, 구성 가이드
+- Consider system aspects: 요금제, 플랜, API, 인증, 알림, 통계, 관리, 보안, 성능
+- Use diverse search angles: technical setup, user guides, troubleshooting, best practices, administration
+
 Requirements:
-- Ensure the follow-up query is self-contained and includes necessary context for Channel Talk knowledge search.
-- Use Korean keywords when appropriate for better search results in Channel Talk documentation.
-- Reference the conversation flow to provide continuity and build upon previously discussed topics.
+- Ensure follow-up queries are optimized for the organization's knowledge base search
+- Include relevant keywords and domain terminology for better search results
+- Reference the conversation flow to provide continuity and build upon previously discussed topics
+- Generate queries that would retrieve specific, actionable information from internal documentation
 
 Output Format:
 - Format your response as a JSON object with these exact keys:
    - "is_sufficient": true or false
-   - "knowledge_gap": Describe what Channel Talk information is missing or needs clarification
-   - "follow_up_queries": Write a specific question to address this gap in Channel Talk knowledge
+   - "knowledge_gap": Describe what information is missing or needs clarification
+   - "follow_up_queries": Array of 1-3 search-optimized queries for internal knowledge base
 
 Example:
 ```json
 {{
-    "is_sufficient": true, // or false
-    "knowledge_gap": "The search results lack information about specific Channel Talk configuration settings", // "" if is_sufficient is true
-    "follow_up_queries": ["채널톡 설정 방법 구체적인 절차"] // [] if is_sufficient is true
+    "is_sufficient": false,
+    "knowledge_gap": "The search results lack specific information about API integration procedures and authentication methods",
+    "follow_up_queries": [
+        "API 연동 설정 인증 토큰 발급 방법 가이드",
+        "REST API 웹훅 구현 절차 예제 문서",
+        "API 권한 설정 보안 구성 사용법"
+    ]
 }}
 ```
 
-Reflect carefully on the Channel Talk Knowledge Search Results to identify knowledge gaps and produce a follow-up query. Then, produce your output following this JSON format:
+Reflect carefully on the Internal Knowledge Search Results to identify knowledge gaps and produce search-optimized follow-up queries. Then, produce your output following this JSON format:
 
 Knowledge Search Results:
 {summaries}
@@ -197,9 +234,9 @@ Instructions:
 - Generate a high-quality answer to the user's question based on the provided summaries and the user's question.
 - Consider the conversation context to provide continuity and reference previous discussions when relevant.
 - If the summaries contain web search results, include the sources correctly using markdown format (e.g. [apnews](https://vertexaisearch.cloud.google.com/id/1-0)).
-- If the summaries contain Channel Talk knowledge search results, include the sources correctly using markdown format (e.g. [title](#)). THIS IS A MUST.
-- If the summaries contain Channel Talk knowledge search results, provide accurate Channel Talk service information and use Korean explanations when appropriate.
-- Focus on practical usage and features when answering Channel Talk related questions.
+- If the summaries contain internal knowledge search results, include the sources correctly using markdown format (e.g. [title](#)). THIS IS A MUST.
+- If the summaries contain internal knowledge search results, provide accurate service information based on the organization's documentation.
+- Focus on practical usage and features when answering service-related questions.
 - Build upon previous parts of the conversation and acknowledge any follow-up questions or clarifications from the user.
 
 User Context:
@@ -209,7 +246,7 @@ Summaries:
 {summaries}"""
 
 
-query_classification_instructions = """Analyze the user's query and determine if it requires web search for current/real-time information, internal knowledge search for Channel Talk service information, or can be answered directly.
+query_classification_instructions = """Analyze the user's query and determine if it requires web search for current/real-time information, internal knowledge search for organizational service information, or can be answered directly.
 
 Previous Conversation Context:
 {conversation_history}
@@ -217,9 +254,9 @@ Previous Conversation Context:
 Instructions:
 - The current date is {current_date}.
 - Classify queries that need web search: current events, recent news, latest prices, real-time data, breaking news, stock prices, weather, sports scores, new product releases, recent developments, etc.
-- Classify queries that need knowledge search: Channel Talk features, service usage, configuration, troubleshooting, pricing, integrations, API documentation, user guides, etc.
+- Classify queries that need knowledge search: organizational features, service usage, configuration, troubleshooting, pricing, integrations, API documentation, user guides, internal procedures, system administration, etc.
 - Classify queries that DON'T need search: general knowledge, basic facts, explanations of concepts, historical information, math problems, coding help (general), personal opinions, smalltalk, greetings, etc.
-- Consider if the query explicitly mentions "Channel Talk", "채널톡", or asks about customer service, chat service, or related features.
+- Consider if the query asks about internal services, products, or organizational-specific features and procedures.
 - Be conservative: when in doubt about whether current information is needed, lean towards NOT requiring web search for general knowledge queries.
 - Consider the conversation history to understand the context and ongoing topics that might influence classification.
 
@@ -231,21 +268,7 @@ Query Types:
 - real_time: Live data like weather, stock prices, sports scores
 - historical: Past events, established historical facts
 - technical: Programming, math, science concepts (unless asking for latest versions/updates)
-- domain_knowledge: Channel Talk features, usage, configuration, API, troubleshooting
-    - specific terminology 
-        - 팀챗, 유저챗, 그룹챗
-        - 상담, 상담톡, 상담 태그, 알림톡
-        - 고객센터
-        - 계정 인증, 로그인, 로그아웃
-        - 워크플로우
-        - 도큐먼트, FAQ
-        - 알프(ALF)
-        - 미트
-        - IVR
-        - 플랜, 요금제, 구독
-        - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버, 인스타그램, 페이스북, SNS 등)
-        - 고객 연락처, 고객 정보
-        - etc ...
+- domain_knowledge: Organizational features, usage, configuration, API, troubleshooting, internal procedures
     
 Format your response as a JSON object with these exact keys:
 - "needs_web_search": true or false
@@ -258,7 +281,7 @@ Example:
 {{
     "needs_web_search": false,
     "needs_knowledge_search": true,
-    "reasoning": "This question asks about Channel Talk service features which requires internal knowledge base search.",
+    "reasoning": "This question asks about organizational service features which requires internal knowledge base search.",
     "query_type": "domain_knowledge"
 }}
 ```

@@ -47,7 +47,7 @@ class Configuration(BaseModel):
     )
 
     force_search_mode: Literal["auto", "web", "knowledge"] = Field(
-        default="auto",
+        default="knowledge",
         metadata={
             "description": "Force search mode configuration. 'auto' follows normal classification logic, 'web' forces web search, 'knowledge' forces knowledge search."
         },
