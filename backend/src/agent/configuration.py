@@ -1,6 +1,6 @@
 import os
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from langchain_core.runnables import RunnableConfig
 
@@ -43,6 +43,20 @@ class Configuration(BaseModel):
         default=2,
         metadata={
             "description": "The maximum number of intent clarification attempts before forcing to proceed."
+        },
+    )
+
+    force_search_mode: Literal["auto", "web", "knowledge"] = Field(
+        default="auto",
+        metadata={
+            "description": "Force search mode configuration. 'auto' follows normal classification logic, 'web' forces web search, 'knowledge' forces knowledge search."
+        },
+    )
+
+    enable_intent_clarify: bool = Field(
+        default=False,
+        metadata={
+            "description": "Whether to enable intent clarification functionality. If True, unclear queries will be clarified. If False, will proceed directly to the next step."
         },
     )
 

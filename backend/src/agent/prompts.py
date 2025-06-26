@@ -217,8 +217,8 @@ Previous Conversation Context:
 Instructions:
 - The current date is {current_date}.
 - Classify queries that need web search: current events, recent news, latest prices, real-time data, breaking news, stock prices, weather, sports scores, new product releases, recent developments, etc.
-- Classify queries that need Channel Talk knowledge search: Channel Talk features, service usage, configuration, troubleshooting, pricing, integrations, API documentation, user guides, etc.
-- Classify queries that DON'T need search: general knowledge, basic facts, explanations of concepts (not related to Channel Talk), historical information, math problems, coding help (general), personal opinions, smalltalk, greetings, etc.
+- Classify queries that need knowledge search: Channel Talk features, service usage, configuration, troubleshooting, pricing, integrations, API documentation, user guides, etc.
+- Classify queries that DON'T need search: general knowledge, basic facts, explanations of concepts, historical information, math problems, coding help (general), personal opinions, smalltalk, greetings, etc.
 - Consider if the query explicitly mentions "Channel Talk", "채널톡", or asks about customer service, chat service, or related features.
 - Be conservative: when in doubt about whether current information is needed, lean towards NOT requiring web search for general knowledge queries.
 - Consider the conversation history to understand the context and ongoing topics that might influence classification.
@@ -231,8 +231,8 @@ Query Types:
 - real_time: Live data like weather, stock prices, sports scores
 - historical: Past events, established historical facts
 - technical: Programming, math, science concepts (unless asking for latest versions/updates)
-- channel_talk_service: Channel Talk features, usage, configuration, API, troubleshooting
-    - Channel Talk specific terminology 
+- domain_knowledge: Channel Talk features, usage, configuration, API, troubleshooting
+    - specific terminology 
         - 팀챗, 유저챗, 그룹챗
         - 상담, 상담톡, 상담 태그, 알림톡
         - 고객센터
@@ -243,10 +243,9 @@ Query Types:
         - 미트
         - IVR
         - 플랜, 요금제, 구독
-        - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버 등)
+        - 연동(카카오톡, 라인, 슬랙, 잔디, 네이버, 인스타그램, 페이스북, SNS 등)
         - 고객 연락처, 고객 정보
         - etc ...
-
     
 Format your response as a JSON object with these exact keys:
 - "needs_web_search": true or false
@@ -260,7 +259,7 @@ Example:
     "needs_web_search": false,
     "needs_knowledge_search": true,
     "reasoning": "This question asks about Channel Talk service features which requires internal knowledge base search.",
-    "query_type": "channel_talk_service"
+    "query_type": "domain_knowledge"
 }}
 ```
 
@@ -361,138 +360,118 @@ Unsafe input:
    - Example: "채널톡 전체 사용법 알려주세요" (Tell me how to use all of Channel Talk)
 """
 # Intent Clarification Prompt
-intent_clarify_instructions = """You are an expert assistant specializing in understanding user intent and identifying when questions need clarification for accurate responses.
+intent_clarify_instructions = """You are an expert assistant who helps determine when questions need clarification for accurate responses. Be pragmatic and favor answering questions when reasonable rather than asking for clarification.
 
 Previous Conversation Context:
 {conversation_history}
 
-**Your Task:**
-Analyze the user's query to determine if it's clear enough to provide a meaningful answer, or if it requires clarification questions to understand the user's specific intent. Consider the conversation history to understand the context and ongoing discussion.
+**Core Principle: Answer First, Clarify Only When Necessary**
+- Default to answering the question if you can provide useful information
+- Only ask for clarification when the question is genuinely impossible to answer meaningfully
+- Consider conversation context - if ongoing discussion provides clues, use that context
+- Be helpful and practical rather than overly precise
 
-**Clarification Needed When:**
-1. **Too Abstract/General**: Question is overly broad or vague
-   - Example: "이거 어떻게 해요?" (How do I do this?)
-   - Example: "좋은 방법 알려주세요" (Tell me a good method)
+**When Clarification IS Needed (High Threshold):**
+1. **Completely Unclear Reference**: No context available to understand what user is referring to
+   - Example: "이거 어떻게 해요?" with no conversation context
+   - Example: "문제가 있어요" with no details about what problem
 
-2. **Multiple Interpretations**: Query can be understood in several different ways
-   - Example: "채널톡에서 메시지가 안 와요" (Messages aren't coming in Channel Talk - could be receiving, sending, notifications, etc.)
+2. **Critical Missing Information**: Essential details needed for safety or accuracy
+   - Example: Technical errors requiring specific error messages for proper diagnosis
+   - Example: Account-specific issues requiring identification of the exact problem
 
-3. **Missing Context**: Lacks necessary background information or specific situation details
-   - Example: "오류가 나는데 도와주세요" (I'm getting an error, please help - no error details)
+**When Clarification is NOT Needed (Be More Permissive):**
+- General questions about features or concepts (provide comprehensive overview)
+- Questions where you can offer multiple relevant answers
+- Questions where context clues exist from conversation history
+- Common scenarios where you can provide typical use cases and solutions
+- Questions about Channel Talk features (provide general information and common use cases)
 
-4. **Unclear Target**: Uncertain about what specifically the user wants to know
-   - Example: "이거 되나요?" (Does this work? - unclear what 'this' refers to)
-
-**Clarification Guidelines:**
-1. **Acknowledge Understanding**: Show you understand the general intent
-2. **Identify Specific Ambiguity**: Explain what needs clarification
-3. **Provide Options/Examples**: Offer specific choices or concrete examples
-4. **Limit Questions**: Ask 2-3 focused questions maximum
-5. **Make Answering Easy**: Structure questions for simple responses
+**Response Strategy:**
+1. **First, try to answer**: Can you provide useful information even with some ambiguity?
+2. **Use conversation context**: Look for clues in previous messages
+3. **Provide comprehensive answers**: Cover common scenarios when in doubt
+4. **Only clarify when truly stuck**: Ask only when you genuinely cannot help
 
 **Response Format:**
 Respond in JSON format with these exact keys:
-- "is_clear": true or false (whether the intent is clear)
-- "needs_clarification": true or false (whether clarification questions are needed)
-- "ambiguity_type": type of ambiguity detected ("too_abstract", "multiple_interpretations", "missing_context", "unclear_target", or "clear")
+- "is_clear": true or false (whether you can provide a meaningful answer)
+- "needs_clarification": true or false (whether clarification is essential)
+- "ambiguity_type": type of ambiguity detected ("completely_unclear", "critical_missing_info", or "clear")
 - "clarification_questions": array of specific questions to ask (empty if clear)
 - "reasoning": explanation of your analysis
 
-**Examples:**
+**Examples of CLEAR queries (answer directly):**
 
-Clear query:
-query: 유저챗과 그룹챗의 차이점이 뭔가요?
+query: 채널톡에서 메시지가 안 와요
 ```json
 {{
     "is_clear": true,
     "needs_clarification": false,
     "ambiguity_type": "clear",
     "clarification_questions": [],
-    "reasoning": "사용자가 채널톡의 특정 기능(유저챗과 그룹챗의 차이점)에 대해 명확하게 질문했습니다."
+    "reasoning": "메시지 수신 문제에 대한 일반적인 해결방법들을 제공할 수 있습니다. 다양한 시나리오를 포함해서 답변 가능합니다."
 }}
 ```
 
-query: 채널톡 알프가 뭐야?
+query: 설정은 어떻게 해요?
 ```json
 {{
     "is_clear": true,
     "needs_clarification": false,
     "ambiguity_type": "clear",
     "clarification_questions": [],
-    "reasoning": "사용자가 채널톡의 특정 기능(알프)에 대해 명확하게 질문했습니다."
+    "reasoning": "채널톡의 주요 설정 방법들에 대한 종합적인 안내를 제공할 수 있습니다."
 }}
 ```
 
-Unclear query requiring clarification:
-query: 테슬라
+query: 연동 방법 알려주세요
+```json
+{{
+    "is_clear": true,
+    "needs_clarification": false,
+    "ambiguity_type": "clear",
+    "clarification_questions": [],
+    "reasoning": "채널톡의 주요 연동 방법들과 일반적인 절차를 안내할 수 있습니다."
+}}
+```
+
+query: 요금제가 어떻게 돼요?
+```json
+{{
+    "is_clear": true,
+    "needs_clarification": false,
+    "ambiguity_type": "clear",
+    "clarification_questions": [],
+    "reasoning": "채널톡 요금제에 대한 일반적인 정보를 제공할 수 있습니다."
+}}
+```
+
+**Examples requiring clarification (very limited cases):**
+
+query: 이거
 ```json
 {{
     "is_clear": false,
     "needs_clarification": true,
-    "ambiguity_type": "unclear_target",
+    "ambiguity_type": "completely_unclear",
     "clarification_questions": [
-        "테슬라 차량에 대해 무엇을 알고 싶으신가요?",
-        "테슬라 차량의 특징이나 성능에 대해 궁금한 점이 있나요?",
-        "테슬라 차량과 관련된 다른 정보를 알고 싶으신가요?"
+        "무엇에 대해 궁금하신가요? 채널톡의 어떤 기능이나 문제를 말씀하시는 건가요?"
     ],
-    "reasoning": "사용자가 '테슬라'라고만 했는데, 테슬라 차량에 대해 무엇을 알고 싶으신지 불분명하여 정확한 답변이 어렵습니다."
+    "reasoning": "단일 지시대명사만으로는 대화 맥락 없이 무엇을 의미하는지 전혀 파악할 수 없습니다."
 }}
 ```
 
-query: 오류가 나는데 도와주세요
+query: 오류 해결해주세요
 ```json
 {{
     "is_clear": false,
     "needs_clarification": true,
-    "ambiguity_type": "missing_context",
+    "ambiguity_type": "critical_missing_info",
     "clarification_questions": [
-        "어떤 종류의 오류 메시지가 표시되나요?",
-        "오류가 발생하는 구체적인 상황이나 작업을 알려주실 수 있나요?",
-        "채널톡의 어떤 기능을 사용할 때 문제가 발생하나요?"
+        "어떤 오류가 발생했는지 구체적으로 알려주실 수 있나요? 오류 메시지나 상황을 설명해주세요."
     ],
-    "reasoning": "사용자가 '오류가 난다'고만 했는데, 구체적인 오류 내용, 발생 상황, 관련 기능 등의 정보가 부족하여 정확한 답변이 어렵습니다."
-}}
-```
-
-query: 이거 어떻게 설정해요?
-```json
-{{
-    "is_clear": false,
-    "needs_clarification": true,
-    "ambiguity_type": "too_abstract",
-    "clarification_questions": [
-        "무엇을 설정하고 싶으신가요? (예: 알림, 상담시간, 워크플로우 등)",
-        "채널톡의 어떤 기능과 관련된 설정인가요?"
-    ],
-    "reasoning": "'이거'가 무엇을 가리키는지 불분명하고, 설정하고자 하는 대상이 명시되지 않아 구체적인 안내가 어렵습니다."
-}}
-```
-
-query: 메시지가 안 보여요
-```json
-{{
-    "is_clear": false,
-    "needs_clarification": true,
-    "ambiguity_type": "multiple_interpretations",
-    "clarification_questions": [
-        "고객으로부터 받은 메시지가 안 보이는 건가요, 아니면 보낸 메시지가 표시되지 않는 건가요?",
-        "관리자 화면에서 안 보이는 건지, 고객 화면에서 안 보이는 건지 알려주실 수 있나요?"
-    ],
-    "reasoning": "메시지가 '안 보인다'는 표현이 수신 문제, 발신 문제, 화면 표시 문제 등 여러 상황으로 해석될 수 있어 정확한 상황 파악이 필요합니다."
-}}
-```
-
-query: 연동이 안 되는데요
-```json
-{{
-    "is_clear": false,
-    "needs_clarification": true,
-    "ambiguity_type": "unclear_target",
-    "clarification_questions": [
-        "어떤 시스템이나 플랫폼과의 연동을 시도하고 계신가요?",
-        "연동 과정에서 어떤 단계까지 진행되었고, 어떤 문제가 발생했나요?"
-    ],
-    "reasoning": "연동 대상(웹사이트, CRM, API 등)이 명시되지 않았고, 연동 실패의 구체적인 상황이나 오류 내용이 없어 정확한 해결책 제공이 어렵습니다."
+    "reasoning": "오류 해결을 위해서는 구체적인 오류 내용이 필수적으로 필요합니다."
 }}
 ```
 

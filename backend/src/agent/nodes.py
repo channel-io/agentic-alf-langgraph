@@ -307,16 +307,36 @@ def classify_query(
 
     Analyzes the user's question to determine if it requires current/real-time information
     that would need web search, Channel Talk internal knowledge search, or if it can be answered directly with general knowledge.
+    Can be overridden by search_mode configuration.
 
     Args:
         state: Current graph state containing the user's question
-        config: Configuration for the runnable, including LLM provider settings
+        config: Configuration for the runnable, including LLM provider settings and search_mode
 
     Returns:
         Dictionary with state update, including needs_web_search, needs_knowledge_search and query classification info
     """
     configurable = Configuration.from_runnable_config(config)
 
+    # Force specific search based on search_mode
+    if configurable.force_search_mode == "web":
+        print("Force search mode가 'web'으로 설정되어 웹 검색을 강제 실행합니다.")
+        return {
+            "needs_web_search": True,
+            "needs_knowledge_search": False,
+            "query_classification": "web_search_required",
+            "messages": state["messages"],
+        }
+    elif configurable.force_search_mode == "knowledge":
+        print("Force search mode가 'knowledge'로 설정되어 지식 검색을 강제 실행합니다.")
+        return {
+            "needs_web_search": False,
+            "needs_knowledge_search": True,
+            "query_classification": "knowledge_search_required",
+            "messages": state["messages"],
+        }
+
+    # Default auto behavior - perform normal classification
     # init Gemini 2.0 Flash
     llm = ChatGoogleGenerativeAI(
         model=configurable.query_generator_model,

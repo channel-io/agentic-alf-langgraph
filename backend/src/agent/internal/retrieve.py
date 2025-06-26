@@ -178,7 +178,7 @@ if __name__ == "__main__":
     import asyncio
 
     async def main():
-        query = "유저챗 그룹챗 차이"
+        query = "airCloset Dressにおいて、お客様が起因で汚損・紛失があった場合の対応について、暫定対応も含め教えて下さい"
         embeddings, latency = await generate_embeddings([query])
         # print(f"Latency: {latency:.2f} seconds")
         print(f"First embedding: {embeddings[0] if embeddings else []}")

@@ -52,7 +52,7 @@ def route_after_intent_clarify_search(state: OverallState, config) -> str:
 
     Args:
         state: Current graph state containing the intent clarity and classification results
-        config: Configuration for the runnable, including max_intent_clarify_attempts setting
+        config: Configuration for the runnable, including max_intent_clarify_attempts and enable_intent_clarify settings
 
     Returns:
         String literal indicating the next node to visit
@@ -61,6 +61,17 @@ def route_after_intent_clarify_search(state: OverallState, config) -> str:
 
     configurable = Configuration.from_runnable_config(config)
     current_count = state.get("intent_clarify_count", 0)
+
+    # If intent clarification is disabled, skip clarification and proceed directly
+    if not configurable.enable_intent_clarify:
+        print("Intent clarification이 비활성화되어 다음 단계로 진행합니다.")
+        # Proceed based on configuration or original classification
+        if state.get("needs_web_search"):
+            return "generate_query"
+        elif state.get("needs_knowledge_search"):
+            return "generate_knowledge_query"
+        else:
+            return "direct_answer"
 
     # If we've reached the maximum clarification attempts, force proceed with search or direct answer
     if current_count >= configurable.max_intent_clarify_attempts:
@@ -76,7 +87,7 @@ def route_after_intent_clarify_search(state: OverallState, config) -> str:
             return "direct_answer"
 
     # Normal flow - check if clarification is needed
-    if not state["is_clear_intent"]:
+    if not state["needs_clarification"]:
         return "provide_clarification"
 
     # Check the original classification to determine search type
