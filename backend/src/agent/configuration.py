@@ -47,14 +47,14 @@ class Configuration(BaseModel):
     )
 
     force_search_mode: Literal["auto", "web", "knowledge"] = Field(
-        default="knowledge",
+        default="auto",
         metadata={
             "description": "Force search mode configuration. 'auto' follows normal classification logic, 'web' forces web search, 'knowledge' forces knowledge search."
         },
     )
 
     enable_intent_clarify: bool = Field(
-        default=False,
+        default=True,
         metadata={
             "description": "Whether to enable intent clarification functionality. If True, unclear queries will be clarified. If False, will proceed directly to the next step."
         },

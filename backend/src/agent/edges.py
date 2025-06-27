@@ -87,7 +87,7 @@ def route_after_intent_clarify_search(state: OverallState, config) -> str:
             return "direct_answer"
 
     # Normal flow - check if clarification is needed
-    if not state["needs_clarification"]:
+    if state["needs_clarification"]:
         return "provide_clarification"
 
     # Check the original classification to determine search type
