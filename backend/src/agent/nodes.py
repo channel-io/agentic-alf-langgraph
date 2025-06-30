@@ -539,7 +539,7 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     }
 
 
-def finalize_answer(state: OverallState, config: RunnableConfig):
+def finalize_answer(state: OverallState, config: RunnableConfig) -> OverallState:
     """LangGraph node that finalizes the research summary.
 
     Prepares the final output by deduplicating and formatting sources, then
@@ -594,6 +594,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     return {
         "messages": [AIMessage(content=result.content)],
         "sources_gathered": unique_sources,
+        "research_loop_count": 0,  # reset research loop count
     }
 
 

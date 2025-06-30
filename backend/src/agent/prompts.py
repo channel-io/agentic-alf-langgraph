@@ -47,7 +47,7 @@ Query Strategy Instructions:
 1. **Standalone Queries**: Each query must be self-contained and understandable without context
 2. **Query Decomposition**: If the question has multiple intents or aspects, break it down into separate focused queries
 3. **Query Expansion**: If the query is too specific or abstract, expand it to include related terms and synonyms
-4. **Maximum 3 Queries**: Generate 1-3 queries based on complexity and scope
+4. **Maximum {number_queries} Queries**: Generate 1-{number_queries} queries based on complexity and scope
 5. **Context Awareness**: Consider the conversation history to understand ongoing topics and generate more relevant queries
 
 Query Optimization Guidelines:

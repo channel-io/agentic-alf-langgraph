@@ -110,7 +110,7 @@ export default function App() {
         const queriesText = Array.isArray(followUpQueries) 
         processedEvent = {
           title: "Reflection",
-          data: `Analysing Web Research Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}. \nFollow-up Queries: ${queriesText}`,
+          data: `Analysing Web Research Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}.`,
         };
       } else if (event.knowledge_reflection) {
         const isSufficient = event.knowledge_reflection.is_sufficient || false;
@@ -124,7 +124,7 @@ export default function App() {
           
         processedEvent = {
           title: "Knowledge Reflection",
-          data: `Analysing Knowledge Search Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}. \nFollow-up Queries: ${queriesText}`,
+          data: `Analysing Knowledge Search Results: \n${isSufficient ? "✅ Sufficient" : "❌ Insufficient"}. \nReason: ${knowledgeGap}.`,
         };
       } else if (event.finalize_answer) {
         processedEvent = {
@@ -164,9 +164,9 @@ export default function App() {
 
   useEffect(() => {
     if (
-      hasFinalizeEventOccurredRef.current &&
       !thread.isLoading &&
-      thread.messages.length > 0
+      thread.messages.length > 0 &&
+      processedEventsTimeline.length > 0
     ) {
       const lastMessage = thread.messages[thread.messages.length - 1];
       if (lastMessage && lastMessage.type === "ai" && lastMessage.id) {

@@ -23,7 +23,8 @@ class Configuration(BaseModel):
     )
 
     answer_model: str = Field(
-        default="gemini-2.5-pro",
+        # default="gemini-2.5-pro",
+        default="gemini-2.5-flash",
         metadata={
             "description": "The name of the language model to use for the agent's answer."
         },
