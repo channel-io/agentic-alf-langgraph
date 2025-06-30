@@ -150,7 +150,6 @@ def guardrail_block(state: OverallState, config: RunnableConfig) -> OverallState
 
     return {
         "messages": [AIMessage(content=block_message)],
-        "search_query": [],  # reset search query
     }
 
 
@@ -254,7 +253,6 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
     Returns:
         Dictionary with state update, including a clarification message
     """
-
     configurable = Configuration.from_runnable_config(config)
 
     clarification_questions = state.get("clarification_questions", [])
@@ -296,7 +294,6 @@ def provide_clarification(state: OverallState, config: RunnableConfig) -> Overal
     return {
         "messages": [AIMessage(content=clarification_message)],
         "intent_clarify_count": current_count,
-        "search_query": [],  # reset search query
     }
 
 
@@ -403,7 +400,6 @@ def direct_answer(state: OverallState, config: RunnableConfig) -> OverallState:
 
     return {
         "messages": [AIMessage(content=result.content)],
-        "search_query": [],  # reset search query
     }
 
 
@@ -543,7 +539,7 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     }
 
 
-def finalize_answer(state: OverallState, config: RunnableConfig) -> OverallState:
+def finalize_answer(state: OverallState, config: RunnableConfig):
     """LangGraph node that finalizes the research summary.
 
     Prepares the final output by deduplicating and formatting sources, then
@@ -598,7 +594,6 @@ def finalize_answer(state: OverallState, config: RunnableConfig) -> OverallState
     return {
         "messages": [AIMessage(content=result.content)],
         "sources_gathered": unique_sources,
-        "search_query": [],  # reset search query
     }
 
 
@@ -661,7 +656,6 @@ def knowledge_search(
     Returns:
         Dictionary with state update, including knowledge_search_result key containing the search results
     """
-    configurable = Configuration.from_runnable_config(config)
 
     async def _async_search():
         try:

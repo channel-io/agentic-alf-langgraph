@@ -63,6 +63,7 @@ class ReflectionState(TypedDict):
     follow_up_queries: Annotated[list, operator.add]
     research_loop_count: int
     number_of_ran_queries: int
+    messages: Annotated[list, add_messages]
 
 
 class Query(TypedDict):
@@ -76,6 +77,7 @@ class QueryGenerationState(TypedDict):
     """Query generation node state"""
 
     search_query: list[Query]
+    messages: Annotated[list, add_messages]
 
 
 class QueryClassificationState(TypedDict):
